@@ -8,10 +8,13 @@ team — and for planning how those responsibilities shift as the team grows.
 It works as both a **current-state** roles-and-responsibilities tool and a
 **forward-looking** workforce-planning tool: model open roles you haven't hired
 yet, shift responsibilities onto them, and name people as you fill the seats.
+You can also **co-create** a plan with others: share a snapshot, leave comments,
+and propose changes for review.
 
 > **Prototype status:** This is a front-end prototype. Data is saved in each
-> viewer's own browser — there are no accounts, logins, or shared editing yet.
-> See [Roadmap](#roadmap) for the hosted, multi-user version.
+> viewer's own browser, and collaboration happens by passing **snapshots**
+> (links or files) back and forth — there are no accounts or live shared editing
+> yet. See [Roadmap](#roadmap) for the hosted, multi-user version.
 
 ---
 
@@ -60,6 +63,31 @@ yet, shift responsibilities onto them, and name people as you fill the seats.
 - **Job-description drafter** — open roles can generate a posting drafted from the
   responsibilities they own, editable in place with a copy button.
 
+### Collaboration (co-create)
+
+These let more than one person shape a plan, even without a backend. Everything
+here is attributed to the **"Your name"** you set once in the Share dialog, and
+all of it travels inside a shared plan.
+
+- **Shareable plans** — the **Share** button copies a **link** or downloads a
+  **`.json` file** containing your entire board (all three horizons, costs,
+  effort, comments, and pending suggestions). Whoever opens it loads an editable
+  copy on their device. Open someone's plan by pasting their link/code or
+  importing their file. This is a **snapshot**, not live sync — you draft, send,
+  they tweak, send back.
+- **Comments** — every person/seat and every responsibility has a comment thread.
+  Comment buttons show a count (a card with discussion shows a "💬 N" pill; a seat
+  with comments turns green). Threads show author and relative time; post with the
+  button or **⌘/Ctrl+Enter**, and delete your own.
+- **Suggestion mode** — toggle **Suggest** in the header to *propose* changes
+  instead of applying them. While on, moving, editing, adding, and deleting a
+  responsibility are recorded as **proposals** signed with your name, not changes
+  to the board. Proposals render inline — an amber (or red, for removals) ring and
+  an **Accept / Reject** banner on the affected card, and dashed **ghost cards**
+  for proposed additions. A **"N proposed"** pill opens a review modal to accept
+  or reject each one, or **Accept all / Reject all**. Great for a reviewer who
+  wants to weigh in without overwriting the owner's work.
+
 ---
 
 ## Using it
@@ -77,6 +105,12 @@ yet, shift responsibilities onto them, and name people as you fill the seats.
 | Group by business area | **By function** toggle (top right) |
 | Draft a job description | Open role → document icon in its header |
 | Start a future plan from your team | **Copy from Today / 6 months** |
+| Set your name (for sharing/comments) | **Share** → *Your name* |
+| Share a plan | **Share** → *Copy share link* or *Download file* |
+| Open someone's shared plan | **Share** → paste a link/code, or *Import file* |
+| Comment on a person or responsibility | The 💬 comment icon on a seat header or card |
+| Propose changes for review | Turn on **Suggest**, then edit as normal |
+| Review proposals | **N proposed** pill → Accept / Reject (or per-card banners) |
 | Reset everything | **Reset** (clears all changes on this device) |
 
 ---
@@ -111,20 +145,27 @@ automatically.
 ## Data & privacy
 
 - Edits are stored with the browser's `localStorage`, **per browser and per
-  device**. Two people opening the same link will each keep their own copy.
-- Nothing is sent to a server. There is no account system and no shared source
-  of truth — that is intentional for a prototype.
+  device**. Two people opening the same site will each keep their own copy.
+- **Sharing** is explicit and snapshot-based: a link or file you generate
+  contains the plan at that moment. Anyone with the link/file can open it, so
+  treat them like any document you'd email. A downloaded file works for anyone;
+  opening a share **link** on this Pages site requires access to the (private)
+  repo, so the file is the most portable option until the hosted version exists.
+- Nothing is sent to a server automatically. There is no account system and no
+  live shared source of truth yet — that is intentional for a prototype.
 
 ---
 
 ## Roadmap
 
-The natural next phase is a hosted version with a real backend:
+The natural next phase is a hosted version with a real backend, which upgrades
+today's snapshot-based collaboration into live, multi-user editing:
 
-- A shared, single source of truth (one plan the whole team sees).
-- Accounts / sign-in.
+- A shared, single source of truth (one plan the whole team sees in real time),
+  replacing snapshot links/files.
+- Accounts / sign-in, so comments and suggestions attribute automatically.
 - View-only vs. edit **permissions** by user.
-- An audit trail of changes over time.
+- An audit trail of changes over time (suggestion history, who accepted what).
 - **AI-written** responsibility generation and job descriptions, tailored to your
   context (the current versions are library- and template-based).
 
@@ -140,5 +181,7 @@ this prototype.
   plain JavaScript** — there is no in-browser JSX transpiler, which keeps it fast
   and compatible across browsers (including Safari).
 - Styling via the Tailwind CDN.
+- State (including comments and pending suggestions) is serialized to
+  `localStorage`; the same serialized form is what powers Share links and files.
 - If the page can't load its scripts (blocked CDN, offline, etc.) it shows a
   readable error message rather than a blank screen.
