@@ -62,6 +62,12 @@ and propose changes for review.
   edit, not a live model — that's a backend upgrade).
 - **Job-description drafter** — open roles can generate a posting drafted from the
   responsibilities they own, editable in place with a copy button.
+- **AI job descriptions (in the transition plan)** — when the transition plan
+  shows a **new hire**, a *Generate JD* button writes a full job description with
+  **Claude** (`claude-opus-4-8`), grounded in exactly the responsibilities that
+  seat owns in the future view. This calls the real Anthropic API and is
+  **bring-your-own-key**: you paste your own Anthropic API key once (stored only
+  in your browser, sent directly to Anthropic) — see [Data & privacy](#data--privacy).
 
 ### Collaboration (co-create)
 
@@ -104,6 +110,7 @@ all of it travels inside a shared plan.
 | Generate responsibilities | **Generate** → choose function + granularity |
 | Group by business area | **By function** toggle (top right) |
 | Draft a job description | Open role → document icon in its header |
+| Generate a job description with AI | **Transition plan** → *Generate JD* on a new hire (needs your Anthropic API key) |
 | Start a future plan from your team | **Copy from Today / 6 months** |
 | Set your name (for sharing/comments) | **Share** → *Your name* |
 | Share a plan | **Share** → *Copy share link* or *Download file* |
@@ -153,6 +160,14 @@ automatically.
   a downloaded file works the same way offline.
 - Nothing is sent to a server automatically. There is no account system and no
   live shared source of truth yet — that is intentional for a prototype.
+- **AI job descriptions (BYOK):** the only feature that calls an external service.
+  Your Anthropic API key is stored **only in this browser** (`localStorage`),
+  never committed to the repo and never sent anywhere except `api.anthropic.com`
+  (directly, over HTTPS) when you press *Generate JD*. Because this is a static
+  site that loads scripts from public CDNs, treat the key as you would any secret
+  on a shared device: use a workspace-scoped key with a **monthly spend cap**, and
+  revoke it if in doubt. A server-side proxy (so no key lives in the browser) is
+  the planned upgrade for wider use — see [Roadmap](#roadmap).
 
 ---
 
@@ -166,8 +181,11 @@ today's snapshot-based collaboration into live, multi-user editing:
 - Accounts / sign-in, so comments and suggestions attribute automatically.
 - View-only vs. edit **permissions** by user.
 - An audit trail of changes over time (suggestion history, who accepted what).
-- **AI-written** responsibility generation and job descriptions, tailored to your
-  context (the current versions are library- and template-based).
+- A **server-side proxy** for the Claude API so AI job descriptions no longer
+  need a key in the browser (today's AI JD is bring-your-own-key).
+- **AI-written** responsibility generation, and AI job descriptions extended to
+  every open role (the generator is still library-based; the JD drafter on open
+  roles is still template-based — only the transition-plan JD uses Claude so far).
 
 That requires a backend (e.g. Supabase or Firebase) and is a separate build from
 this prototype.

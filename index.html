@@ -122,6 +122,60 @@ const relTime = ts => {
   }
 };
 const norm = s => (s || "").trim().toLowerCase();
+const KEY_STORE = "forester-anthropic-key";
+const loadApiKey = () => {
+  try {
+    return localStorage.getItem(KEY_STORE) || "";
+  } catch (e) {
+    return "";
+  }
+};
+const saveApiKey = k => {
+  try {
+    localStorage.setItem(KEY_STORE, k || "");
+  } catch (e) {}
+};
+const generateJD = async ({
+  role,
+  area,
+  responsibilities,
+  cost,
+  apiKey
+}) => {
+  const respList = responsibilities && responsibilities.length ? responsibilities.map(r => "- " + r).join("\n") : "(none specified)";
+  const prompt = "Write a complete, ready-to-post job description for the following role at Boreal Education, a growing education company.\n\n" + "Role title: " + role + "\n" + "Function area: " + (area || "general") + "\n" + (cost > 0 ? "Target total compensation: about " + fmtMoney(cost) + " per year\n" : "") + "\nThe person in this role will own these responsibilities:\n" + respList + "\n\n" + "Base the 'What you'll own' section directly on those responsibilities. Infer reasonable requirements and qualifications from them. Keep it tight, concrete, and human.";
+  const system = "You are an expert people-ops lead and recruiter writing concise, compelling job descriptions for Boreal Education. Output plain text only — no markdown, no asterisks, no bold. Use these section headings, each on its own line: About the role, What you'll own, What we're looking for, Nice to have, About Boreal Education, How to apply. Base responsibilities strictly on what you are given; do not invent unrelated duties. Only use a short [bracketed placeholder] for details that genuinely cannot be inferred (exact location, compensation if not provided, application link).";
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-8",
+      max_tokens: 2000,
+      system: system,
+      messages: [{
+        role: "user",
+        content: prompt
+      }]
+    })
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error("Couldn't read the API response.");
+  }
+  if (!res.ok) {
+    const m = data && data.error && data.error.message ? data.error.message : "API error (" + res.status + ")";
+    throw new Error(m);
+  }
+  const out = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
+  return out || "(The model returned an empty response — try again.)";
+};
 const isVacant = p => !p.name || !p.name.trim();
 const cardWeight = c => WEIGHT[c.weight] || 2;
 const colLabel = col => col.id === UNASSIGNED ? "Unassigned" : col.name && col.name.trim() || col.role && col.role.trim() || "Open role";
@@ -2525,7 +2579,18 @@ function TransitionPlan({
 }) {
   const [fromKey, setFromKey] = useState(initialFrom === "m12" ? "today" : initialFrom);
   const [toKey, setToKey] = useState(NEXT[initialFrom] || "m12");
+  const [jdHire, setJdHire] = useState(null);
   const diff = diffViews(views[fromKey], views[toKey]);
+  const dstView = views[toKey];
+  const cardsForSeat = id => (dstView.cards || []).filter(x => x.personId === id);
+  const newHires = [...diff.addedSeats.map(d => ({
+    seat: d,
+    cards: cardsForSeat(d.id)
+  })), ...diff.filledSeats.map(p => ({
+    seat: p[1],
+    cards: cardsForSeat(p[1].id)
+  }))];
+  const hireFunc = cards => Array.from(new Set(cards.map(x => x.func && x.func.trim()).filter(Boolean))).join(", ");
   const Section = ({
     title,
     items,
@@ -2564,7 +2629,7 @@ function TransitionPlan({
   }, t.label)));
   const c = diff.cost;
   const deltaColor = c.delta > 0 ? LOAD_WARN : c.delta < 0 ? TEAL : "#52635A";
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
     style: {
       background: "rgba(13,33,22,.5)"
@@ -2642,7 +2707,51 @@ function TransitionPlan({
     style: {
       color: "#52635A"
     }
-  }, "No differences between ", tabLabel(fromKey), " and ", tabLabel(toKey), " yet. Try copying one forward and adjusting it.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Section, {
+  }, "No differences between ", tabLabel(fromKey), " and ", tabLabel(toKey), " yet. Try copying one forward and adjusting it.") : /*#__PURE__*/React.createElement("div", null, newHires.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold uppercase tracking-wide mb-2",
+    style: {
+      color: TEAL
+    }
+  }, "New hires — draft a job description (", newHires.length, ")"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, newHires.map((h, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "rounded-lg p-3 flex items-center justify-between gap-3",
+    style: {
+      background: "#F4F9F5",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-semibold",
+    style: {
+      color: SLATE
+    }
+  }, h.seat.role && h.seat.role.trim() || colLabel(h.seat)), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs",
+    style: {
+      color: "#52635A"
+    }
+  }, h.cards.length, h.cards.length === 1 ? " responsibility" : " responsibilities", h.seat.cost > 0 ? " · " + fmtMoney(h.seat.cost) + "/yr" : "")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setJdHire({
+      role: h.seat.role && h.seat.role.trim() || colLabel(h.seat),
+      area: hireFunc(h.cards),
+      responsibilities: h.cards.map(c => c.desc).filter(Boolean),
+      cost: h.seat.cost || 0
+    }),
+    disabled: h.cards.length === 0,
+    title: h.cards.length === 0 ? "Assign responsibilities to this seat first" : "Generate with AI",
+    className: "ab-btn flex items-center gap-1.5 text-sm font-semibold rounded-full px-3 py-2 flex-shrink-0 disabled:opacity-40",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 15
+  }), " Generate JD"))))), /*#__PURE__*/React.createElement(Section, {
     tone: TEAL,
     title: "Roles to add",
     items: diff.addedSeats.map(d => (isVacant(d) ? "Open role: " : "Add person: ") + colLabel(d) + (d.cost > 0 ? " (" + fmtMoney(d.cost) + "/yr)" : ""))
@@ -2666,7 +2775,13 @@ function TransitionPlan({
     tone: LOAD_OVER,
     title: "Responsibilities dropped",
     items: diff.removed.map(r => "\"" + r.label + "\" (was " + r.owner + ")")
-  }))))));
+  })))))), jdHire && /*#__PURE__*/React.createElement(AIJDModal, {
+    role: jdHire.role,
+    area: jdHire.area,
+    responsibilities: jdHire.responsibilities,
+    cost: jdHire.cost,
+    onClose: () => setJdHire(null)
+  }));
 }
 function GeneratorPanel({
   func,
@@ -2843,6 +2958,168 @@ function GeneratorPanel({
       color: "#9AA89E"
     }
   }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice.")));
+}
+function AIJDModal({
+  role,
+  area,
+  responsibilities,
+  cost,
+  onClose
+}) {
+  const [keyInput, setKeyInput] = useState(loadApiKey());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const run = async () => {
+    const key = (keyInput || "").trim();
+    if (!key) {
+      setError("Enter your Anthropic API key first.");
+      return;
+    }
+    saveApiKey(key);
+    setError("");
+    setLoading(true);
+    setText("");
+    try {
+      const out = await generateJD({
+        role,
+        area,
+        responsibilities,
+        cost,
+        apiKey: key
+      });
+      setText(out);
+    } catch (e) {
+      setError(e && e.message || "Something went wrong calling the API.");
+    }
+    setLoading(false);
+  };
+  const copy = () => {
+    try {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch (e) {}
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.55)",
+      zIndex: 60
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-2xl my-8",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 min-w-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: TEAL
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-base truncate",
+    style: {
+      color: SLATE
+    }
+  }, "Job description (AI) — ", role)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5 flex-shrink-0",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mb-3",
+    style: {
+      color: "#52635A"
+    }
+  }, "Written by Claude (claude-opus-4-8) from this role's ", responsibilities.length, responsibilities.length === 1 ? " responsibility" : " responsibilities", ". Your key is stored only in this browser and sent directly to Anthropic."), /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-semibold mb-1",
+    style: {
+      color: "#52635A"
+    }
+  }, "Anthropic API key"), /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: keyInput,
+    onChange: e => setKeyInput(e.target.value),
+    placeholder: "sk-ant-…",
+    className: "w-full rounded-lg px-3 py-2 text-sm mb-1",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mb-3",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "Get one at console.anthropic.com → API keys. Tip: set a monthly spend cap on the key."), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: run,
+    disabled: loading,
+    className: "ab-btn flex items-center gap-1.5 text-sm font-semibold rounded-full px-4 py-2 disabled:opacity-50",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 15
+  }), " ", loading ? "Drafting…" : text ? "Regenerate" : "Generate"), loading && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs",
+    style: {
+      color: "#52635A"
+    }
+  }, "This takes a few seconds.")), error && /*#__PURE__*/React.createElement("div", {
+    className: "text-sm rounded-lg px-3 py-2 mb-3",
+    style: {
+      background: "#FEE2E2",
+      color: LOAD_OVER,
+      border: "1px solid " + LOAD_OVER
+    }
+  }, error), text && /*#__PURE__*/React.createElement("textarea", {
+    value: text,
+    onChange: e => setText(e.target.value),
+    rows: 16,
+    className: "w-full rounded-lg px-3 py-2 text-sm",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE,
+      fontFamily: "ui-monospace, Menlo, monospace"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end gap-2 mt-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: "#52635A",
+      border: "1px solid " + COL_BORDER
+    }
+  }, "Close"), text && /*#__PURE__*/React.createElement("button", {
+    onClick: copy,
+    className: "ab-btn text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, copied ? "Copied!" : "Copy")))));
 }
 function JDModal({
   seat,
