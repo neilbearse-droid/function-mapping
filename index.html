@@ -16,6 +16,24 @@
     .ab-btn { transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease; }
     .ab-btn:focus-visible, .ab-card:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
     #ab-error { display:none; max-width:640px; margin:40px auto; padding:20px 24px; border:1px solid #F6D27A; background:#FFFBEB; border-radius:12px; color:#92400E; font-size:14px; line-height:1.5; }
+    .konami-overlay { position:fixed; inset:0; pointer-events:none; z-index:99999; overflow:hidden; }
+    .konami-drop { position:absolute; top:-12vh; will-change:transform; animation:konamiFall linear 1 forwards; }
+    @keyframes konamiFall {
+      0% { transform:translateY(-12vh) rotate(0deg); opacity:0; }
+      8% { opacity:1; }
+      100% { transform:translateY(114vh) rotate(720deg); opacity:1; }
+    }
+    .konami-banner {
+      position:absolute; top:16%; left:50%; transform:translateX(-50%);
+      background:#14532D; color:#fff; font-weight:800; letter-spacing:.04em;
+      padding:14px 26px; border-radius:9999px; font-size:clamp(14px,3.2vw,26px);
+      box-shadow:0 16px 40px rgba(20,83,45,.45); white-space:nowrap;
+      animation:konamiPop .5s cubic-bezier(.18,1.5,.4,1) 1 both, konamiWiggle 1.1s ease-in-out infinite .5s;
+    }
+    @keyframes konamiPop { 0%{transform:translateX(-50%) scale(0) rotate(-12deg);} 100%{transform:translateX(-50%) scale(1) rotate(0);} }
+    @keyframes konamiWiggle { 0%,100%{margin-top:0;} 25%{margin-top:-6px;} 75%{margin-top:6px;} }
+    .konami-spin { animation:konamiSpin 1s ease-in-out 1; }
+    @keyframes konamiSpin { 0%{transform:rotate(0) scale(1);} 50%{transform:rotate(360deg) scale(1.15);} 100%{transform:rotate(720deg) scale(1);} }
   </style>
 </head>
 <body>
@@ -539,7 +557,26 @@ function App() {
   const [commentTarget, setCommentTarget] = useState(null);
   const [suggestMode, setSuggestMode] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [party, setParty] = useState(0);
   const [author, setAuthor] = useState(loadName());
+  useEffect(() => {
+    const seq = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
+    let pos = 0;
+    const onKey = e => {
+      const k = (e.key || "").toLowerCase();
+      if (k === seq[pos]) {
+        pos++;
+        if (pos === seq.length) {
+          pos = 0;
+          setParty(p => p + 1);
+        }
+      } else {
+        pos = k === seq[0] ? 1 : 0;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   useEffect(() => {
     saveName(author);
   }, [author]);
@@ -877,8 +914,10 @@ function App() {
       borderBottom: "1px solid " + COL_BORDER
     }
   }, /*#__PURE__*/React.createElement("img", {
+    key: "logo-" + party,
     src: "assets/forester-logo.png",
     alt: "Forester by Boreal Education",
+    className: party > 0 ? "konami-spin" : "",
     style: {
       height: 64,
       width: "auto"
@@ -1327,7 +1366,36 @@ function App() {
       }));
     },
     onClose: () => setReviewOpen(false)
+  }), party > 0 && /*#__PURE__*/React.createElement(KonamiRain, {
+    key: party,
+    onDone: () => setParty(0)
   }));
+}
+function KonamiRain({
+  onDone
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 7000);
+    return () => clearTimeout(t);
+  }, []);
+  const EMOJI = ["🌲", "🌳", "🦌", "🍃", "🪵", "🪓", "🐿️", "🍂", "⛺", "🔥", "🐻", "🍄"];
+  const drops = Array.from({
+    length: 110
+  }).map((_, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "konami-drop",
+    style: {
+      left: Math.random() * 100 + "vw",
+      animationDelay: Math.random() * 3 + "s",
+      animationDuration: 3 + Math.random() * 3.5 + "s",
+      fontSize: 16 + Math.random() * 34 + "px"
+    }
+  }, EMOJI[Math.floor(Math.random() * EMOJI.length)]));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "konami-overlay"
+  }, drops, /*#__PURE__*/React.createElement("div", {
+    className: "konami-banner"
+  }, "🌲🦌  FOREST PARTY UNLOCKED  🦌🌲"));
 }
 function SuggestionsModal({
   suggestions,
