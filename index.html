@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boreal — Roles & Workforce Plan</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <style>
+    body { background:#EEF2F3; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .ab-card { transition: box-shadow .15s ease, transform .15s ease; }
+    .ab-card:hover { box-shadow: 0 6px 18px rgba(21,76,102,.22); }
+    .ab-dragging { opacity:.4; }
+    .ab-btn:focus-visible, .ab-card:focus-visible { outline: 2px solid #1B5E7E; outline-offset: 2px; }
+    #ab-error { display:none; max-width:640px; margin:40px auto; padding:20px 24px; border:1px solid #E6C98F; background:#FCF8F1; border-radius:12px; color:#7a4a00; font-size:14px; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="ab-error"></div>
+  <script>
+    function abFail(msg){
+      var e=document.getElementById("ab-error");
+      if(e){ e.style.display="block"; e.innerHTML="<strong>Could not load the board.</strong><br>"+msg; }
+    }
+    if(!window.React || !window.ReactDOM){
+      abFail("React did not load. If you opened this file directly from your computer, serve it over http instead (GitHub Pages works), or check that unpkg.com is not blocked by a content blocker or network filter.");
+    }
+  </script>
+  <script>
+  if(window.React && window.ReactDOM){
+  try {
+const {
+  useState,
+  useRef,
+  useEffect
+} = React;
+const TEAL = "#1B5E7E";
+const PAGE_BG = "#EEF2F3";
+const COL_BORDER = "#DCE3E5";
+const SLATE = "#0F2430";
+const DROP_BG = "#E7F1F5";
+const AMBER_TX = "#9A5B00";
+const AMBER_PILL = "#FBEBCF";
+const AMBER_BORDER = "#E6C98F";
+const VACANT_BG = "#FCF8F1";
+const LOAD_WARN = "#C2780E";
+const LOAD_OVER = "#C0392B";
+const UNASSIGNED = "__unassigned__";
+const STORE_KEY = "boreal-accountability-v2";
+const DEFAULT_TARGET = 5;
+const WEIGHT = {
+  S: 1,
+  M: 2,
+  L: 3
+};
+const WEIGHTS = ["S", "M", "L"];
+const uid = () => Math.random().toString(36).slice(2, 9);
+const norm = s => (s || "").trim().toLowerCase();
+const isVacant = p => !p.name || !p.name.trim();
+const cardWeight = c => WEIGHT[c.weight] || 2;
+const colLabel = col => col.id === UNASSIGNED ? "Unassigned" : col.name && col.name.trim() || col.role && col.role.trim() || "Open role";
+const fmtMoney = n => "$" + (Number(n) || 0).toLocaleString("en-US");
+const respKey = c => norm(c.func) + "¦" + norm(c.desc);
+const seatMatchable = (a, b) => {
+  const ra = norm(a.role),
+    rb = norm(b.role),
+    na = norm(a.name),
+    nb = norm(b.name);
+  return ra && ra === rb || na && na === nb;
+};
+const TABS = [{
+  key: "today",
+  label: "Today"
+}, {
+  key: "m6",
+  label: "In 6 months"
+}, {
+  key: "m12",
+  label: "In 12 months"
+}];
+const PREV = {
+  m6: "today",
+  m12: "m6"
+};
+const NEXT = {
+  today: "m6",
+  m6: "m12"
+};
+const tabLabel = k => (TABS.find(t => t.key === k) || {}).label || k;
+const GRAIN = ["Broad", "Standard", "Detailed", "Granular"];
+const FUNCTIONS = ["Marketing", "Sales", "HR & People", "Finance & Accounting", "IT", "Operations", "Customer Support", "Product", "Legal & Compliance", "Office & Exec Admin"];
+const LIBRARY = {
+  "Marketing": {
+    1: ["Owns overall marketing strategy and the brand", "Owns demand generation and the marketing-sourced pipeline", "Owns marketing reporting and budget"],
+    2: ["Owns brand positioning, messaging, and visual identity", "Owns the content program across the website and channels", "Owns demand generation campaigns and lead flow", "Owns the marketing technology stack and automation", "Owns marketing analytics, attribution, and budget"],
+    3: ["Owns brand guidelines and creative direction", "Owns the website, SEO, and organic search performance", "Owns paid acquisition across search and social", "Owns email marketing, nurture, and lifecycle campaigns", "Owns events, webinars, and field marketing", "Owns marketing automation, CRM hygiene, and lead routing", "Owns campaign reporting, attribution, and the marketing budget"],
+    4: ["Owns brand guidelines, messaging frameworks, and creative review", "Owns website content, landing pages, and conversion optimization", "Owns SEO strategy, technical SEO, and organic content", "Owns paid search and paid social campaign management", "Owns the email and nurture program, including list segmentation", "Owns social media channels and the publishing calendar", "Owns events, webinars, sponsorships, and trade shows", "Owns marketing automation, lead scoring, and CRM sync", "Owns analytics, attribution, dashboards, and budget tracking"]
+  },
+  "Sales": {
+    1: ["Owns revenue targets and the sales pipeline", "Owns the sales process and team performance", "Owns sales forecasting and reporting"],
+    2: ["Owns new-business acquisition and quota attainment", "Owns the sales pipeline, stages, and conversion", "Owns pricing, proposals, and deal approvals", "Owns account management and renewals", "Owns sales forecasting, reporting, and CRM data"],
+    3: ["Owns outbound prospecting and lead qualification", "Owns the sales pipeline and opportunity management", "Owns demos, proposals, and negotiation", "Owns pricing, discounting, and contract approvals", "Owns account management, upsell, and renewals", "Owns sales enablement, playbooks, and rep onboarding", "Owns forecasting, quota tracking, and CRM hygiene"],
+    4: ["Owns territory planning and account assignment", "Owns outbound prospecting, cadences, and lead qualification", "Owns discovery, demos, and solution scoping", "Owns proposals, quotes, and negotiation", "Owns pricing rules, discount approvals, and contract terms", "Owns deal-stage management and pipeline reviews", "Owns account management, renewals, and expansion", "Owns rep onboarding, coaching, and enablement content", "Owns forecasting, commission tracking, and CRM reporting"]
+  },
+  "HR & People": {
+    1: ["Owns hiring and workforce planning", "Owns employee experience and culture", "Owns compensation, benefits, and HR compliance"],
+    2: ["Owns recruiting and onboarding", "Owns performance management and development", "Owns compensation and benefits", "Owns employee relations and culture", "Owns HR policy, records, and compliance"],
+    3: ["Owns workforce planning and headcount approvals", "Owns recruiting, interviewing, and offers", "Owns onboarding and new-hire enablement", "Owns performance reviews and career development", "Owns compensation, benefits, and payroll coordination", "Owns employee relations, engagement, and culture", "Owns HR policy, records, and employment compliance"],
+    4: ["Owns workforce planning, headcount budgeting, and approvals", "Owns sourcing, recruiting, and candidate experience", "Owns interviewing, offers, and background checks", "Owns onboarding, orientation, and 30/60/90 plans", "Owns performance review cycles and goal setting", "Owns career pathing, training, and development programs", "Owns compensation bands, benefits administration, and payroll coordination", "Owns employee relations, investigations, and engagement surveys", "Owns HR policy, recordkeeping, and employment-law compliance"]
+  },
+  "Finance & Accounting": {
+    1: ["Owns financial planning and budgeting", "Owns accounting, controls, and reporting", "Owns cash, treasury, and compliance"],
+    2: ["Owns budgeting, forecasting, and financial planning", "Owns the monthly close and financial reporting", "Owns accounts payable and receivable", "Owns payroll, taxes, and compliance", "Owns cash management and banking relationships"],
+    3: ["Owns annual budgeting and rolling forecasts", "Owns the monthly close, reconciliations, and reporting", "Owns accounts payable and vendor payments", "Owns accounts receivable, invoicing, and collections", "Owns payroll processing and benefits funding", "Owns tax filings, audits, and regulatory compliance", "Owns cash flow, treasury, and banking relationships"],
+    4: ["Owns the annual budget, rolling forecasts, and variance analysis", "Owns the month-end close and account reconciliations", "Owns the general ledger and chart of accounts", "Owns accounts payable, expense management, and vendor payments", "Owns accounts receivable, invoicing, and collections", "Owns payroll processing, commissions, and benefits funding", "Owns tax planning, filings, and external audit coordination", "Owns cash flow management, treasury, and banking relationships", "Owns financial controls, policy, and management reporting"]
+  },
+  "IT": {
+    1: ["Owns IT systems and infrastructure", "Owns security and data protection", "Owns IT support and vendor management"],
+    2: ["Owns infrastructure, networks, and cloud", "Owns endpoints, identity, and access", "Owns cybersecurity and data protection", "Owns business applications and integrations", "Owns IT support, vendors, and procurement"],
+    3: ["Owns network, servers, and cloud infrastructure", "Owns device management, identity, and access control", "Owns cybersecurity, monitoring, and incident response", "Owns backups, disaster recovery, and business continuity", "Owns core business applications and integrations", "Owns the IT helpdesk and end-user support", "Owns IT vendor management, licensing, and procurement"],
+    4: ["Owns network architecture, connectivity, and uptime", "Owns server, cloud, and infrastructure operations", "Owns device provisioning, patching, and endpoint management", "Owns identity, single sign-on, and access provisioning", "Owns cybersecurity obligations, including vendor and audit partner management for SOC 2", "Owns security monitoring, threat detection, and incident response", "Owns backups, disaster recovery, and continuity testing", "Owns business applications, integrations, and data pipelines", "Owns the IT helpdesk, asset inventory, and procurement"]
+  },
+  "Operations": {
+    1: ["Owns day-to-day operations and process", "Owns supply chain and fulfillment", "Owns operational metrics and improvement"],
+    2: ["Owns core business processes and workflows", "Owns supply chain, procurement, and inventory", "Owns service or production delivery", "Owns quality, safety, and standards", "Owns operational reporting and improvement"],
+    3: ["Owns process design and workflow documentation", "Owns procurement and supplier management", "Owns inventory and logistics", "Owns service or production delivery and capacity", "Owns quality assurance and safety standards", "Owns facilities and equipment", "Owns operational KPIs and continuous improvement"],
+    4: ["Owns end-to-end process design and standard operating procedures", "Owns procurement, supplier selection, and contracts", "Owns inventory planning and stock control", "Owns logistics, shipping, and fulfillment", "Owns service or production scheduling and capacity planning", "Owns quality assurance, inspections, and standards", "Owns health, safety, and regulatory operations", "Owns facilities, equipment, and maintenance", "Owns operational dashboards, cost control, and process improvement"]
+  },
+  "Customer Support": {
+    1: ["Owns customer support and satisfaction", "Owns support operations and tooling", "Owns support quality and reporting"],
+    2: ["Owns frontline customer support", "Owns escalations and issue resolution", "Owns the help center and self-service content", "Owns support tooling and workflows", "Owns support metrics and customer satisfaction"],
+    3: ["Owns frontline support across channels", "Owns ticket triage, prioritization, and SLAs", "Owns escalations and complex issue resolution", "Owns the knowledge base and self-service content", "Owns the support tooling and ticketing system", "Owns customer feedback and product hand-offs", "Owns support KPIs, CSAT, and reporting"],
+    4: ["Owns frontline support across email, chat, and phone", "Owns ticket triage, routing, and prioritization", "Owns SLA management and response-time targets", "Owns escalations, complex cases, and resolution tracking", "Owns the knowledge base, macros, and self-service content", "Owns the ticketing system, automation, and workflows", "Owns agent onboarding, coaching, and quality assurance", "Owns customer feedback loops and product issue hand-offs", "Owns CSAT, support KPIs, and reporting"]
+  },
+  "Product": {
+    1: ["Owns product strategy and roadmap", "Owns product delivery and quality", "Owns product performance and feedback"],
+    2: ["Owns product vision and roadmap", "Owns discovery and requirements", "Owns delivery and release management", "Owns product quality and user experience", "Owns product metrics and customer feedback"],
+    3: ["Owns product vision, strategy, and roadmap", "Owns user research and discovery", "Owns requirements, specs, and prioritization", "Owns the delivery backlog and release planning", "Owns user experience and design coordination", "Owns launch, adoption, and enablement", "Owns product analytics and feedback loops"],
+    4: ["Owns product vision, strategy, and the roadmap", "Owns user research, discovery, and validation", "Owns requirements, specifications, and acceptance criteria", "Owns backlog prioritization and sprint planning", "Owns delivery coordination with engineering", "Owns user experience, design review, and usability", "Owns release management, QA sign-off, and rollout", "Owns launch, adoption, and customer enablement", "Owns product analytics, experimentation, and feedback synthesis"]
+  },
+  "Legal & Compliance": {
+    1: ["Owns contracts and legal risk", "Owns compliance and policy", "Owns regulatory and corporate matters"],
+    2: ["Owns contracts and commercial agreements", "Owns corporate governance and entity matters", "Owns regulatory compliance and policy", "Owns data privacy and protection", "Owns dispute and risk management"],
+    3: ["Owns contract drafting, review, and negotiation", "Owns vendor and customer agreements", "Owns corporate governance and board support", "Owns regulatory compliance and licensing", "Owns data privacy, protection, and DPA management", "Owns intellectual property and trademarks", "Owns disputes, claims, and outside counsel"],
+    4: ["Owns contract drafting, review, and negotiation", "Owns the contract repository and renewals", "Owns vendor, customer, and partner agreements", "Owns corporate governance, filings, and board support", "Owns regulatory compliance, licensing, and reporting", "Owns data privacy programs and processing agreements", "Owns intellectual property, trademarks, and licensing", "Owns policy management and compliance training", "Owns disputes, claims, and outside-counsel management"]
+  },
+  "Office & Exec Admin": {
+    1: ["Owns office operations and administration", "Owns executive support and scheduling", "Owns internal coordination and events"],
+    2: ["Owns office management and facilities", "Owns executive scheduling and support", "Owns travel and expense coordination", "Owns vendor and supplier coordination", "Owns internal communications and events"],
+    3: ["Owns office operations, supplies, and facilities", "Owns executive calendars and meeting coordination", "Owns travel booking and expense management", "Owns vendor relationships and office procurement", "Owns onboarding logistics for new hires", "Owns internal events and team coordination", "Owns records, documentation, and administrative workflows"],
+    4: ["Owns office operations, supplies, and facilities upkeep", "Owns executive calendars and meeting scheduling", "Owns all scheduling of meetings for leadership", "Owns travel arrangements and itineraries", "Owns expense reporting and reconciliation", "Owns vendor coordination and office procurement", "Owns onboarding logistics and workspace setup for new hires", "Owns internal events, offsites, and team coordination", "Owns records management and administrative documentation"]
+  }
+};
+const SUBTITLE = {
+  today: "Your team today, and how responsibilities are divided right now.",
+  m6: "Plan 6 months out — add open roles, shift responsibilities onto them, and add names as you hire.",
+  m12: "Plan 12 months out — model the team you'll need as workload grows."
+};
+
+// ---- inline icons ----
+const Svg = ({
+  children,
+  size = 16
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: "2",
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, children);
+const IconPlus = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M5 12h14"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 5v14"
+}));
+const IconX = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M18 6 6 18"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M6 6l12 12"
+}));
+const IconCheck = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M20 6 9 17l-5-5"
+}));
+const IconPencil = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M12 20h9"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"
+}));
+const IconTrash = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M3 6h18"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+}));
+const IconGrip = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
+  cx: "9",
+  cy: "5",
+  r: "1"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "9",
+  cy: "12",
+  r: "1"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "9",
+  cy: "19",
+  r: "1"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "15",
+  cy: "5",
+  r: "1"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "15",
+  cy: "12",
+  r: "1"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "15",
+  cy: "19",
+  r: "1"
+}));
+const IconUserPlus = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "9",
+  cy: "7",
+  r: "4"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M19 8v6"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M22 11h-6"
+}));
+const IconMove = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M15 10l5 5-5 5"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M4 4v7a4 4 0 0 0 4 4h12"
+}));
+const IconCopy = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("rect", {
+  x: "9",
+  y: "9",
+  width: "13",
+  height: "13",
+  rx: "2"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+}));
+const IconRoute = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
+  cx: "6",
+  cy: "19",
+  r: "3"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "18",
+  cy: "5",
+  r: "3"
+}));
+const IconSparkle = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M12 3l1.8 4.9L19 9.7l-5.2 1.8L12 16l-1.8-4.5L5 9.7l5.2-1.8L12 3z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M19 14l.7 1.9L21.5 16l-1.8.7L19 18.5l-.7-1.8L16.5 16l1.8-.6L19 14z"
+}));
+const IconDoc = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M14 2v6h6"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 13h8"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 17h8"
+}));
+const IconWarn = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 9v4"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 17h.01"
+}));
+const SEED = {
+  tab: "today",
+  meta: {
+    capacityTarget: DEFAULT_TARGET
+  },
+  views: {
+    today: {
+      people: [{
+        id: "go",
+        name: "GO",
+        role: "",
+        cost: 0
+      }, {
+        id: "la",
+        name: "LA",
+        role: "",
+        cost: 0
+      }, {
+        id: "admin",
+        name: "Admin",
+        role: "",
+        cost: 0
+      }, {
+        id: "mkt",
+        name: "Marketing Director",
+        role: "",
+        cost: 0
+      }],
+      cards: [{
+        id: uid(),
+        personId: "go",
+        func: "IT",
+        desc: "Owns all cybersecurity obligations, including vendor and audit partner management for SOC 2"
+      }, {
+        id: uid(),
+        personId: "admin",
+        func: "Admin",
+        desc: "Owns all scheduling of meetings for Graeme"
+      }, {
+        id: uid(),
+        personId: "admin",
+        func: "Admin",
+        desc: "Owns all onboarding logistics for new hires"
+      }, {
+        id: uid(),
+        personId: "mkt",
+        func: "Marketing",
+        desc: "Owns all creative strategy and direction, including briefing creative teams/agencies"
+      }]
+    },
+    m6: {
+      people: [],
+      cards: []
+    },
+    m12: {
+      people: [],
+      cards: []
+    }
+  }
+};
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+function saveState(s) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
+function diffViews(src, dst) {
+  const srcP = src.people,
+    dstP = dst.people;
+  const usedDst = new Array(dstP.length).fill(false);
+  const matched = [],
+    removedSeats = [];
+  srcP.forEach(s => {
+    let idx = -1;
+    for (let i = 0; i < dstP.length; i++) {
+      if (!usedDst[i] && seatMatchable(s, dstP[i])) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx >= 0) {
+      usedDst[idx] = true;
+      matched.push([s, dstP[idx]]);
+    } else removedSeats.push(s);
+  });
+  const addedSeats = dstP.filter((_, i) => !usedDst[i]);
+  const filledSeats = matched.filter(([s, d]) => isVacant(s) && !isVacant(d));
+  const srcCanon = {},
+    dstCanon = {},
+    labelSrc = {
+      UN: "Unassigned"
+    },
+    labelDst = {
+      UN: "Unassigned"
+    };
+  matched.forEach(([s, d], i) => {
+    const c = "m" + i;
+    srcCanon[s.id] = c;
+    dstCanon[d.id] = c;
+    labelSrc[c] = colLabel(s);
+    labelDst[c] = colLabel(d);
+  });
+  removedSeats.forEach((s, i) => {
+    const c = "r" + i;
+    srcCanon[s.id] = c;
+    labelSrc[c] = colLabel(s);
+  });
+  addedSeats.forEach((d, i) => {
+    const c = "a" + i;
+    dstCanon[d.id] = c;
+    labelDst[c] = colLabel(d);
+  });
+  const ownerSrc = pid => pid ? srcCanon[pid] || "UN" : "UN";
+  const ownerDst = pid => pid ? dstCanon[pid] || "UN" : "UN";
+  const srcResp = {},
+    dstResp = {};
+  src.cards.forEach(c => {
+    srcResp[respKey(c)] = {
+      canon: ownerSrc(c.personId),
+      card: c
+    };
+  });
+  dst.cards.forEach(c => {
+    dstResp[respKey(c)] = {
+      canon: ownerDst(c.personId),
+      card: c
+    };
+  });
+  const moved = [],
+    added = [],
+    removed = [];
+  const keys = new Set([...Object.keys(srcResp), ...Object.keys(dstResp)]);
+  keys.forEach(k => {
+    const s = srcResp[k],
+      d = dstResp[k];
+    const label = d && d.card.desc || s && s.card.desc || d && d.card.func || s && s.card.func || "(untitled)";
+    if (s && !d) removed.push({
+      label,
+      owner: labelSrc[s.canon] || "?"
+    });else if (!s && d) added.push({
+      label,
+      owner: labelDst[d.canon] || "?"
+    });else if (s && d && s.canon !== d.canon) moved.push({
+      label,
+      from: labelSrc[s.canon] || "?",
+      to: labelDst[d.canon] || "?"
+    });
+  });
+  const sum = arr => arr.reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  const cost = {
+    src: sum(srcP),
+    dst: sum(dstP),
+    delta: sum(dstP) - sum(srcP),
+    newRoles: sum(addedSeats)
+  };
+  const hasChanges = addedSeats.length || removedSeats.length || filledSeats.length || moved.length || added.length || removed.length;
+  return {
+    addedSeats,
+    removedSeats,
+    filledSeats,
+    moved,
+    added,
+    removed,
+    cost,
+    hasChanges
+  };
+}
+function App() {
+  const init = loadState() || SEED;
+  const [views, setViews] = useState(init.views);
+  const [tab, setTab] = useState(init.tab || "today");
+  const [meta, setMeta] = useState(init.meta || {
+    capacityTarget: DEFAULT_TARGET
+  });
+  const [dragId, setDragId] = useState(null);
+  const [overCol, setOverCol] = useState(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genFunc, setGenFunc] = useState("Marketing");
+  const [genGrain, setGenGrain] = useState(2);
+  const [genResults, setGenResults] = useState([]);
+  const [genDrag, setGenDrag] = useState(null);
+  const [groupBy, setGroupBy] = useState("person");
+  const [jd, setJd] = useState(null);
+  useEffect(() => {
+    saveState({
+      views,
+      tab,
+      meta
+    });
+  }, [views, tab, meta]);
+  const target = meta.capacityTarget || DEFAULT_TARGET;
+  const view = views[tab];
+  const setView = fn => setViews(v => ({
+    ...v,
+    [tab]: fn(v[tab])
+  }));
+  const setCards = fn => setView(vw => ({
+    ...vw,
+    cards: fn(vw.cards)
+  }));
+  const setPeople = fn => setView(vw => ({
+    ...vw,
+    people: fn(vw.people)
+  }));
+  const columns = [{
+    id: UNASSIGNED,
+    name: "Unassigned"
+  }, ...view.people];
+  const cardsFor = colId => view.cards.filter(c => colId === UNASSIGNED ? !c.personId || c.personId === UNASSIGNED : c.personId === colId);
+  const seatLoad = pid => cardsFor(pid).reduce((a, c) => a + cardWeight(c), 0);
+  const keyRiskOf = pid => cardsFor(pid).filter(c => c.weight === "L").length >= 2;
+  const funcNames = Array.from(new Set(view.cards.map(c => c.func && c.func.trim() || "Unfiled"))).sort();
+  const cardsForFunc = fn => view.cards.filter(c => (c.func && c.func.trim() || "Unfiled") === fn);
+  const personLabel = pid => {
+    if (!pid) return "Unassigned";
+    const pp = view.people.find(x => x.id === pid);
+    return pp ? colLabel(pp) : "Unassigned";
+  };
+  const setCardFunc = (cardId, fn) => setCards(cs => cs.map(c => c.id === cardId ? {
+    ...c,
+    func: fn === "Unfiled" ? "" : fn
+  } : c));
+  const moveCard = (cardId, colId) => setCards(cs => cs.map(c => c.id === cardId ? {
+    ...c,
+    personId: colId === UNASSIGNED ? null : colId
+  } : c));
+  const addCard = colId => setCards(cs => [...cs, {
+    id: uid(),
+    personId: colId === UNASSIGNED ? null : colId,
+    func: "",
+    desc: "",
+    weight: "M",
+    _new: true
+  }]);
+  const updateCard = (id, patch) => setCards(cs => cs.map(c => c.id === id ? {
+    ...c,
+    ...patch
+  } : c));
+  const deleteCard = id => setCards(cs => cs.filter(c => c.id !== id));
+  const addGenerated = (payload, colId) => setCards(cs => [...cs, {
+    id: uid(),
+    personId: colId === UNASSIGNED ? null : colId,
+    func: payload.func,
+    desc: payload.desc,
+    weight: "M"
+  }]);
+  const addPerson = () => {
+    const isToday = tab === "today";
+    const newP = isToday ? {
+      id: uid(),
+      name: "New teammate",
+      role: "",
+      cost: 0,
+      _new: true
+    } : {
+      id: uid(),
+      name: "",
+      role: "New role",
+      cost: 0,
+      _new: true
+    };
+    setPeople(p => [...p, newP]);
+  };
+  const updatePerson = (id, patch) => setPeople(p => p.map(x => x.id === id ? {
+    ...x,
+    ...patch
+  } : x));
+  const deletePerson = id => {
+    setCards(cs => cs.map(c => c.personId === id ? {
+      ...c,
+      personId: null
+    } : c));
+    setPeople(p => p.filter(x => x.id !== id));
+  };
+  const copyFrom = fromKey => {
+    const nonEmpty = view.people.length || view.cards.length;
+    if (nonEmpty && !window.confirm("Replace everything in this view with a copy of " + tabLabel(fromKey) + "?")) return;
+    const srcV = views[fromKey];
+    const idMap = {};
+    const people = srcV.people.map(p => {
+      const nid = uid();
+      idMap[p.id] = nid;
+      const {
+        _new,
+        ...rest
+      } = p;
+      return {
+        ...rest,
+        id: nid
+      };
+    });
+    const cards = srcV.cards.map(c => {
+      const {
+        _new,
+        ...rest
+      } = c;
+      return {
+        ...rest,
+        id: uid(),
+        personId: c.personId ? idMap[c.personId] || null : null
+      };
+    });
+    setViews(v => ({
+      ...v,
+      [tab]: {
+        people,
+        cards
+      }
+    }));
+  };
+  const resetAll = () => {
+    if (window.confirm("Reset every view to the starting layout? This clears all changes on this device.")) {
+      const fresh = JSON.parse(JSON.stringify(SEED.views));
+      fresh.today.cards = fresh.today.cards.map(c => ({
+        ...c,
+        id: uid()
+      }));
+      setViews(fresh);
+      setMeta({
+        capacityTarget: DEFAULT_TARGET
+      });
+      setTab("today");
+    }
+  };
+  const filled = view.people.filter(p => !isVacant(p)).length;
+  const open = view.people.filter(p => isVacant(p)).length;
+  const overloaded = view.people.filter(p => seatLoad(p.id) > target).length;
+  const keyRisks = view.people.filter(p => !isVacant(p) && keyRiskOf(p.id)).length;
+  const headcountCost = view.people.reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  const toHireCost = view.people.filter(isVacant).reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  const prevKey = PREV[tab];
+  const emptyFuture = tab !== "today" && view.people.length === 0 && view.cards.length === 0;
+  const chip = (label, val, color) => /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-baseline gap-1 rounded-md px-2.5 py-1 text-xs",
+    style: {
+      background: "#fff",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold",
+    style: {
+      color: color || SLATE
+    }
+  }, val), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#5B6B72"
+    }
+  }, label));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: PAGE_BG,
+      minHeight: "100vh",
+      color: SLATE
+    },
+    className: "w-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "max-w-full mx-auto px-6 py-6",
+    style: {
+      paddingRight: genOpen ? 360 : undefined,
+      transition: "padding .2s ease"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-4 flex-wrap mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex rounded-lg p-1",
+    style: {
+      background: "#E2E8EA"
+    }
+  }, TABS.map(t => {
+    const active = t.key === tab;
+    return /*#__PURE__*/React.createElement("button", {
+      key: t.key,
+      onClick: () => setTab(t.key),
+      className: "ab-btn text-sm font-semibold rounded-md px-4 py-1.5",
+      style: {
+        background: active ? "#fff" : "transparent",
+        color: active ? TEAL : "#5B6B72",
+        boxShadow: active ? "0 1px 3px rgba(0,0,0,.12)" : "none"
+      }
+    }, t.label);
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setGenOpen(true),
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-2",
+    style: {
+      color: "#fff",
+      background: "#6B4FB8"
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 15
+  }), " Generate"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPlanOpen(true),
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconRoute, {
+    size: 15
+  }), " Transition plan"), prevKey && /*#__PURE__*/React.createElement("button", {
+    onClick: () => copyFrom(prevKey),
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconCopy, {
+    size: 15
+  }), " Copy from ", tabLabel(prevKey)), /*#__PURE__*/React.createElement("button", {
+    onClick: addPerson,
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconUserPlus, {
+    size: 16
+  }), " ", tab === "today" ? "Add teammate" : "Add role"), /*#__PURE__*/React.createElement("button", {
+    onClick: resetAll,
+    className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
+    style: {
+      color: "#5B6B72",
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, "Reset"))), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-3",
+    style: {
+      color: "#5B6B72"
+    }
+  }, SUBTITLE[tab]), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 flex-wrap mb-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap"
+  }, chip(filled === 1 ? "person" : "people", filled), open > 0 && chip(open === 1 ? "open role" : "open roles", open, AMBER_TX), chip("responsibilities", view.cards.length), chip("headcount cost", fmtMoney(headcountCost)), toHireCost > 0 && chip("to hire", fmtMoney(toHireCost), AMBER_TX), overloaded > 0 && chip(overloaded === 1 ? "overloaded seat" : "overloaded seats", overloaded, LOAD_OVER), keyRisks > 0 && chip(keyRisks === 1 ? "key-person risk" : "key-person risks", keyRisks, LOAD_OVER), /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs",
+    style: {
+      background: "#fff",
+      border: "1px solid " + COL_BORDER,
+      color: "#5B6B72"
+    }
+  }, "Balanced load", /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    max: "40",
+    value: target,
+    onChange: e => setMeta(m => ({
+      ...m,
+      capacityTarget: Math.max(1, Math.min(40, parseInt(e.target.value) || 1))
+    })),
+    className: "w-12 rounded px-1 py-0.5 text-center",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }), "pts / seat")), /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex rounded-lg p-1",
+    style: {
+      background: "#E2E8EA"
+    }
+  }, [["person", "By person"], ["function", "By function"]].map(([k, lbl]) => {
+    const active = groupBy === k;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      onClick: () => setGroupBy(k),
+      className: "ab-btn text-xs font-semibold rounded-md px-3 py-1",
+      style: {
+        background: active ? "#fff" : "transparent",
+        color: active ? TEAL : "#5B6B72",
+        boxShadow: active ? "0 1px 3px rgba(0,0,0,.12)" : "none"
+      }
+    }, lbl);
+  }))), emptyFuture ? /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl text-center px-6 py-14",
+    style: {
+      border: "2px dashed " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-lg font-semibold mb-1"
+  }, "Nothing planned for ", tabLabel(tab).toLowerCase(), " yet"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-5",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Start from your ", tabLabel(prevKey).toLowerCase(), " setup, then add open roles and shift work around — or build from scratch."), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => copyFrom(prevKey),
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-4 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconCopy, {
+    size: 15
+  }), " Copy from ", tabLabel(prevKey)), /*#__PURE__*/React.createElement("button", {
+    onClick: addPerson,
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-4 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconPlus, {
+    size: 15
+  }), " Add an open role"))) : groupBy === "function" ? /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-4 overflow-x-auto pb-4 items-start"
+  }, funcNames.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-sm italic py-10",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, "No responsibilities yet — add some in the by-person view or with Generate."), funcNames.map(fn => {
+    const fcards = cardsForFunc(fn);
+    const pts = fcards.reduce((a, c) => a + cardWeight(c), 0);
+    const isOver = overCol === "fn:" + fn;
+    return /*#__PURE__*/React.createElement("div", {
+      key: fn,
+      onDragOver: e => {
+        e.preventDefault();
+        setOverCol("fn:" + fn);
+      },
+      onDragLeave: () => setOverCol(o => o === "fn:" + fn ? null : o),
+      onDrop: () => {
+        if (dragId) setCardFunc(dragId, fn);else if (genDrag) addGenerated({
+          ...genDrag,
+          func: fn === "Unfiled" ? "" : fn
+        }, UNASSIGNED);
+        setDragId(null);
+        setGenDrag(null);
+        setOverCol(null);
+      },
+      className: "flex-shrink-0 rounded-xl p-3",
+      style: {
+        width: 280,
+        background: isOver ? DROP_BG : "#fff",
+        border: "1px solid " + (isOver ? TEAL : COL_BORDER),
+        borderStyle: isOver ? "dashed" : "solid"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "mb-3"
+    }, /*#__PURE__*/React.createElement("h2", {
+      className: "font-bold text-lg leading-tight truncate",
+      style: {
+        color: fn === "Unfiled" ? "#7A8A90" : SLATE
+      }
+    }, fn), /*#__PURE__*/React.createElement("span", {
+      className: "text-xs",
+      style: {
+        color: "#9AA8AD"
+      }
+    }, fcards.length, " ", fcards.length === 1 ? "responsibility" : "responsibilities", " · ", pts, " pts")), /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col gap-3",
+      style: {
+        minHeight: 40
+      }
+    }, fcards.map(card => /*#__PURE__*/React.createElement(Card, {
+      key: card.id,
+      card: card,
+      columns: columns,
+      dragging: dragId === card.id,
+      ownerLabel: personLabel(card.personId),
+      hideMenu: true,
+      onDragStart: () => setDragId(card.id),
+      onDragEnd: () => setDragId(null),
+      onMove: moveCard,
+      onUpdate: updateCard,
+      onDelete: deleteCard
+    }))));
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-4 overflow-x-auto pb-4 items-start"
+  }, columns.map(col => {
+    const isUn = col.id === UNASSIGNED;
+    const vacant = !isUn && isVacant(col);
+    const colCards = cardsFor(col.id);
+    const isOver = overCol === col.id;
+    const bg = isOver ? DROP_BG : vacant ? VACANT_BG : "#fff";
+    const bc = isOver ? TEAL : vacant ? AMBER_BORDER : COL_BORDER;
+    const bs = isOver || vacant ? "dashed" : "solid";
+    return /*#__PURE__*/React.createElement("div", {
+      key: col.id,
+      onDragOver: e => {
+        e.preventDefault();
+        setOverCol(col.id);
+      },
+      onDragLeave: () => setOverCol(o => o === col.id ? null : o),
+      onDrop: () => {
+        if (dragId) moveCard(dragId, col.id);else if (genDrag) addGenerated(genDrag, col.id);
+        setDragId(null);
+        setGenDrag(null);
+        setOverCol(null);
+      },
+      className: "flex-shrink-0 rounded-xl p-3",
+      style: {
+        width: 280,
+        background: bg,
+        border: "1px solid " + bc,
+        borderStyle: bs
+      }
+    }, /*#__PURE__*/React.createElement(ColumnHeader, {
+      col: col,
+      isUn: isUn,
+      vacant: vacant,
+      count: colCards.length,
+      target: target,
+      load: isUn ? 0 : seatLoad(col.id),
+      keyRisk: !isUn && !vacant && keyRiskOf(col.id),
+      onUpdate: updatePerson,
+      onDelete: deletePerson,
+      onDraftJD: () => setJd({
+        seatId: col.id
+      })
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col gap-3",
+      style: {
+        minHeight: 40
+      }
+    }, colCards.length === 0 && /*#__PURE__*/React.createElement("div", {
+      className: "text-xs italic rounded-lg py-6 text-center",
+      style: {
+        color: "#9AA8AD"
+      }
+    }, isUn ? "No orphaned responsibilities" : "Drop a responsibility here"), colCards.map(card => /*#__PURE__*/React.createElement(Card, {
+      key: card.id,
+      card: card,
+      columns: columns,
+      dragging: dragId === card.id,
+      onDragStart: () => setDragId(card.id),
+      onDragEnd: () => setDragId(null),
+      onMove: moveCard,
+      onUpdate: updateCard,
+      onDelete: deleteCard
+    }))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => addCard(col.id),
+      className: "ab-btn mt-3 w-full flex items-center justify-center gap-1 text-sm font-medium rounded-lg py-2",
+      style: {
+        color: TEAL,
+        border: "1px dashed " + TEAL
+      }
+    }, /*#__PURE__*/React.createElement(IconPlus, {
+      size: 15
+    }), " Add responsibility"));
+  }))), planOpen && /*#__PURE__*/React.createElement(TransitionPlan, {
+    views: views,
+    initialFrom: tab,
+    onClose: () => setPlanOpen(false)
+  }), genOpen && /*#__PURE__*/React.createElement(GeneratorPanel, {
+    func: genFunc,
+    setFunc: setGenFunc,
+    grain: genGrain,
+    setGrain: setGenGrain,
+    results: genResults,
+    onGenerate: () => setGenResults((LIBRARY[genFunc] && LIBRARY[genFunc][genGrain] || []).map(desc => ({
+      id: uid(),
+      func: genFunc,
+      desc
+    }))),
+    onAddOne: item => addGenerated(item, UNASSIGNED),
+    onAddAll: () => genResults.forEach(item => addGenerated(item, UNASSIGNED)),
+    onDragStartItem: item => setGenDrag(item),
+    onDragEndItem: () => setGenDrag(null),
+    onClose: () => setGenOpen(false)
+  }), jd && (() => {
+    const seat = view.people.find(x => x.id === jd.seatId);
+    if (!seat) return null;
+    return /*#__PURE__*/React.createElement(JDModal, {
+      seat: seat,
+      cards: cardsFor(seat.id),
+      onClose: () => setJd(null)
+    });
+  })());
+}
+function LoadBar({
+  load,
+  items,
+  target
+}) {
+  const over = load > target;
+  const color = load > target + 2 ? LOAD_OVER : over ? LOAD_WARN : TEAL;
+  const pct = Math.min(100, load / Math.max(target, load, 1) * 100);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "mt-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-1.5 w-full rounded-full",
+    style: {
+      background: "#E7ECEE"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-1.5 rounded-full",
+    style: {
+      width: pct + "%",
+      background: color
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mt-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, "load ", load, " / ", target, " pts · ", items, " ", items === 1 ? "item" : "items"), over && /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold uppercase tracking-wide rounded px-1 py-0.5",
+    style: {
+      background: load > target + 2 ? "#FBE3E0" : AMBER_PILL,
+      color: load > target + 2 ? LOAD_OVER : AMBER_TX
+    }
+  }, "Overloaded")));
+}
+function ColumnHeader({
+  col,
+  isUn,
+  vacant,
+  count,
+  target,
+  load,
+  keyRisk,
+  onUpdate,
+  onDelete,
+  onDraftJD
+}) {
+  const [editing, setEditing] = useState(col._new || false);
+  const roleRef = useRef(null);
+  const nameRef = useRef(null);
+  const costRef = useRef(null);
+  const save = () => {
+    const role = roleRef.current.value.trim();
+    const name = nameRef.current.value.trim();
+    const cost = parseInt((costRef.current.value || "").replace(/[^0-9]/g, "")) || 0;
+    if (!role && !name) {
+      if (col._new) {
+        onDelete(col.id);
+        return;
+      }
+    }
+    onUpdate(col.id, {
+      role,
+      name,
+      cost,
+      _new: false
+    });
+    setEditing(false);
+  };
+  if (editing && !isUn) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "mb-3 rounded-lg p-2",
+      style: {
+        background: "#F4F7F8",
+        border: "1px solid " + COL_BORDER
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold mb-1",
+      style: {
+        color: "#5B6B72"
+      }
+    }, "Role / title"), /*#__PURE__*/React.createElement("input", {
+      ref: roleRef,
+      autoFocus: true,
+      defaultValue: col.role,
+      placeholder: "e.g. Senior Developer",
+      onKeyDown: e => {
+        if (e.key === "Enter") save();
+      },
+      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
+      style: {
+        border: "1px solid " + COL_BORDER,
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold mb-1",
+      style: {
+        color: "#5B6B72"
+      }
+    }, "Name ", /*#__PURE__*/React.createElement("span", {
+      className: "font-normal"
+    }, "(leave blank for an open role)")), /*#__PURE__*/React.createElement("input", {
+      ref: nameRef,
+      defaultValue: col.name,
+      placeholder: "e.g. Priya Singh",
+      onKeyDown: e => {
+        if (e.key === "Enter") save();
+      },
+      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
+      style: {
+        border: "1px solid " + COL_BORDER,
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold mb-1",
+      style: {
+        color: "#5B6B72"
+      }
+    }, "Target cost ", /*#__PURE__*/React.createElement("span", {
+      className: "font-normal"
+    }, "($ / year, optional)")), /*#__PURE__*/React.createElement("input", {
+      ref: costRef,
+      defaultValue: col.cost || "",
+      placeholder: "e.g. 120000",
+      inputMode: "numeric",
+      onKeyDown: e => {
+        if (e.key === "Enter") save();
+      },
+      className: "w-full rounded px-2 py-1 text-sm bg-white",
+      style: {
+        border: "1px solid " + COL_BORDER,
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-end gap-2 mt-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (col._new) onDelete(col.id);else setEditing(false);
+      },
+      className: "ab-btn p-1.5 rounded",
+      style: {
+        background: "#E2E8EA",
+        color: SLATE
+      },
+      title: "Cancel"
+    }, /*#__PURE__*/React.createElement(IconX, {
+      size: 14
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: save,
+      className: "ab-btn p-1.5 rounded",
+      style: {
+        background: TEAL,
+        color: "#fff"
+      },
+      title: "Save"
+    }, /*#__PURE__*/React.createElement(IconCheck, {
+      size: 14
+    }))));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0 cursor-pointer",
+    onClick: () => !isUn && setEditing(true)
+  }, isUn ? /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-lg leading-tight truncate",
+    style: {
+      color: "#7A8A90"
+    }
+  }, "Unassigned") : vacant ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "inline-block text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mb-1",
+    style: {
+      background: AMBER_PILL,
+      color: AMBER_TX
+    }
+  }, "Open role"), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-lg leading-tight truncate",
+    style: {
+      color: AMBER_TX
+    },
+    title: col.role
+  }, col.role && col.role.trim() || "Untitled role"), col.cost > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs",
+    style: {
+      color: AMBER_TX
+    }
+  }, fmtMoney(col.cost), "/yr to hire")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-lg leading-tight truncate",
+    style: {
+      color: SLATE
+    },
+    title: col.name
+  }, col.name), col.role && col.role.trim() && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs truncate",
+    style: {
+      color: "#7A8A90"
+    }
+  }, col.role), col.cost > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs",
+    style: {
+      color: "#7A8A90"
+    }
+  }, fmtMoney(col.cost), "/yr"), keyRisk && /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mt-1",
+    style: {
+      background: "#FBE3E0",
+      color: LOAD_OVER
+    },
+    title: "Holds multiple critical responsibilities alone"
+  }, /*#__PURE__*/React.createElement(IconWarn, {
+    size: 11
+  }), " Key-person risk"))), !isUn && /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1 flex-shrink-0"
+  }, vacant && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDraftJD && onDraftJD(),
+    className: "ab-btn p-1 rounded hover:bg-black/5",
+    title: "Draft job description",
+    style: {
+      color: AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement(IconDoc, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditing(true),
+    className: "ab-btn p-1 rounded hover:bg-black/5",
+    title: "Edit",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, /*#__PURE__*/React.createElement(IconPencil, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDelete(col.id),
+    className: "ab-btn p-1 rounded hover:bg-black/5",
+    title: "Remove (responsibilities move to Unassigned)",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, /*#__PURE__*/React.createElement(IconTrash, {
+    size: 14
+  })))), isUn ? /*#__PURE__*/React.createElement("span", {
+    className: "text-xs",
+    style: {
+      color: count > 0 ? LOAD_WARN : "#9AA8AD"
+    }
+  }, count, " ", count === 1 ? "responsibility needs an owner" : "responsibilities need an owner") : /*#__PURE__*/React.createElement(LoadBar, {
+    load: load,
+    items: count,
+    target: target
+  }));
+}
+function Card({
+  card,
+  columns,
+  dragging,
+  ownerLabel,
+  hideMenu,
+  onDragStart,
+  onDragEnd,
+  onMove,
+  onUpdate,
+  onDelete
+}) {
+  const [editing, setEditing] = useState(card._new || false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [weight, setWeight] = useState(card.weight || "M");
+  const funcRef = useRef(null);
+  const descRef = useRef(null);
+  if (editing) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "rounded-lg p-3",
+      style: {
+        background: TEAL,
+        color: "#fff"
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold opacity-80 mb-1"
+    }, "Function"), /*#__PURE__*/React.createElement("input", {
+      ref: funcRef,
+      autoFocus: true,
+      defaultValue: card.func,
+      placeholder: "e.g. IT",
+      className: "w-full mb-3 rounded px-2 py-1 text-sm",
+      style: {
+        background: "#fff",
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold opacity-80 mb-1"
+    }, "Owns…"), /*#__PURE__*/React.createElement("textarea", {
+      ref: descRef,
+      defaultValue: card.desc,
+      placeholder: "Describe what this seat owns",
+      rows: 3,
+      className: "w-full rounded px-2 py-1 text-sm resize-none mb-3",
+      style: {
+        background: "#fff",
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold opacity-80 mb-1"
+    }, "Effort"), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-1 mb-1"
+    }, WEIGHTS.map(w => /*#__PURE__*/React.createElement("button", {
+      key: w,
+      onClick: () => setWeight(w),
+      className: "ab-btn flex-1 rounded py-1 text-xs font-semibold",
+      style: {
+        background: weight === w ? "#fff" : "rgba(255,255,255,.18)",
+        color: weight === w ? TEAL : "#fff"
+      }
+    }, w === "S" ? "S · light" : w === "M" ? "M · standard" : "L · heavy"))), /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-end gap-2 mt-3"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (card._new && !card.func && !card.desc) onDelete(card.id);else setEditing(false);
+      },
+      className: "ab-btn p-1.5 rounded",
+      style: {
+        background: "rgba(255,255,255,.18)"
+      },
+      title: "Cancel"
+    }, /*#__PURE__*/React.createElement(IconX, {
+      size: 15
+    })), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        const func = funcRef.current.value.trim();
+        const desc = descRef.current.value.trim();
+        if (!func && !desc) {
+          onDelete(card.id);
+          return;
+        }
+        onUpdate(card.id, {
+          func,
+          desc,
+          weight,
+          _new: false
+        });
+        setEditing(false);
+      },
+      className: "ab-btn p-1.5 rounded",
+      style: {
+        background: "#fff",
+        color: TEAL
+      },
+      title: "Save"
+    }, /*#__PURE__*/React.createElement(IconCheck, {
+      size: 15
+    }))));
+  }
+  const w = card.weight || "M";
+  return /*#__PURE__*/React.createElement("div", {
+    draggable: true,
+    tabIndex: 0,
+    onDragStart: onDragStart,
+    onDragEnd: onDragEnd,
+    className: "ab-card group relative rounded-lg p-3 cursor-grab active:cursor-grabbing " + (dragging ? "ab-dragging" : ""),
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mt-0.5 opacity-50 flex-shrink-0"
+  }, /*#__PURE__*/React.createElement(IconGrip, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1.5 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-sm"
+  }, "Function: ", card.func || "—"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold rounded px-1 py-0.5 flex-shrink-0",
+    style: {
+      background: "rgba(255,255,255,.22)"
+    },
+    title: "Effort: " + (w === "S" ? "light" : w === "M" ? "standard" : "heavy")
+  }, w)), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm leading-snug",
+    style: {
+      opacity: 0.95
+    }
+  }, card.desc || /*#__PURE__*/React.createElement("span", {
+    className: "italic opacity-70"
+  }, "No description yet")), ownerLabel && /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 inline-block text-[11px] rounded px-1.5 py-0.5",
+    style: {
+      background: "rgba(255,255,255,.18)"
+    }
+  }, ownerLabel))), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+  }, !hideMenu && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenuOpen(m => !m),
+    className: "ab-btn p-1 rounded",
+    style: {
+      background: "rgba(255,255,255,.18)"
+    },
+    title: "Move to…"
+  }, /*#__PURE__*/React.createElement(IconMove, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setEditing(true),
+    className: "ab-btn p-1 rounded",
+    style: {
+      background: "rgba(255,255,255,.18)"
+    },
+    title: "Edit"
+  }, /*#__PURE__*/React.createElement(IconPencil, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDelete(card.id),
+    className: "ab-btn p-1 rounded",
+    style: {
+      background: "rgba(255,255,255,.18)"
+    },
+    title: "Delete"
+  }, /*#__PURE__*/React.createElement(IconTrash, {
+    size: 14
+  }))), menuOpen && !hideMenu && /*#__PURE__*/React.createElement("div", {
+    className: "absolute z-10 right-2 rounded-lg shadow-lg py-1 text-sm",
+    style: {
+      top: 36,
+      background: "#fff",
+      color: SLATE,
+      minWidth: 180
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-1 text-xs font-semibold",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, "Move to"), columns.map(col => {
+    const here = col.id === card.personId || col.id === UNASSIGNED && !card.personId;
+    return /*#__PURE__*/React.createElement("button", {
+      key: col.id,
+      disabled: here,
+      onClick: () => {
+        onMove(card.id, col.id);
+        setMenuOpen(false);
+      },
+      className: "ab-btn w-full text-left px-3 py-1.5 hover:bg-black/5 disabled:opacity-40"
+    }, colLabel(col), here && " (current)");
+  })));
+}
+function TransitionPlan({
+  views,
+  initialFrom,
+  onClose
+}) {
+  const [fromKey, setFromKey] = useState(initialFrom === "m12" ? "today" : initialFrom);
+  const [toKey, setToKey] = useState(NEXT[initialFrom] || "m12");
+  const diff = diffViews(views[fromKey], views[toKey]);
+  const Section = ({
+    title,
+    items,
+    tone
+  }) => items.length ? /*#__PURE__*/React.createElement("div", {
+    className: "mb-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold uppercase tracking-wide mb-2",
+    style: {
+      color: tone || "#5B6B72"
+    }
+  }, title, " (", items.length, ")"), /*#__PURE__*/React.createElement("ul", {
+    className: "space-y-1.5"
+  }, items.map((t, i) => /*#__PURE__*/React.createElement("li", {
+    key: i,
+    className: "text-sm flex gap-2",
+    style: {
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: tone || "#9AA8AD"
+    }
+  }, "•"), /*#__PURE__*/React.createElement("span", null, t))))) : null;
+  const sel = (val, set) => /*#__PURE__*/React.createElement("select", {
+    value: val,
+    onChange: e => set(e.target.value),
+    className: "rounded-md px-2 py-1 text-sm bg-white",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, TABS.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.key,
+    value: t.key
+  }, t.label)));
+  const c = diff.cost;
+  const deltaColor = c.delta > 0 ? LOAD_WARN : c.delta < 0 ? TEAL : "#5B6B72";
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(15,36,48,.45)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-2xl my-8",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap text-sm",
+    style: {
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold"
+  }, "Transition plan:"), sel(fromKey, setFromKey), " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#9AA8AD"
+    }
+  }, "→"), " ", sel(toKey, setToKey)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    style: {
+      color: "#5B6B72"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4"
+  }, fromKey === toKey ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Pick two different horizons to compare.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3 mb-4 flex flex-wrap items-center gap-x-6 gap-y-1",
+    style: {
+      background: "#F4F7F8",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Headcount cost "), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold"
+  }, fmtMoney(c.src), " → ", fmtMoney(c.dst)), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold",
+    style: {
+      color: deltaColor
+    }
+  }, " (", c.delta >= 0 ? "+" : "", fmtMoney(c.delta), ")")), c.newRoles > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-sm"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#5B6B72"
+    }
+  }, "New roles add "), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold",
+    style: {
+      color: AMBER_TX
+    }
+  }, fmtMoney(c.newRoles), "/yr"))), !diff.hasChanges ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "No differences between ", tabLabel(fromKey), " and ", tabLabel(toKey), " yet. Try copying one forward and adjusting it.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Section, {
+    tone: TEAL,
+    title: "Roles to add",
+    items: diff.addedSeats.map(d => (isVacant(d) ? "Open role: " : "Add person: ") + colLabel(d) + (d.cost > 0 ? " (" + fmtMoney(d.cost) + "/yr)" : ""))
+  }), /*#__PURE__*/React.createElement(Section, {
+    tone: AMBER_TX,
+    title: "Seats to fill",
+    items: diff.filledSeats.map(([s, d]) => "Hire for " + (s.role && s.role.trim() || colLabel(s)) + " — becomes " + d.name)
+  }), /*#__PURE__*/React.createElement(Section, {
+    tone: LOAD_OVER,
+    title: "Roles removed",
+    items: diff.removedSeats.map(s => colLabel(s))
+  }), /*#__PURE__*/React.createElement(Section, {
+    tone: SLATE,
+    title: "Responsibilities that move",
+    items: diff.moved.map(m => "\"" + m.label + "\" moves from " + m.from + " to " + m.to)
+  }), /*#__PURE__*/React.createElement(Section, {
+    tone: TEAL,
+    title: "New responsibilities",
+    items: diff.added.map(a => "\"" + a.label + "\" → " + a.owner)
+  }), /*#__PURE__*/React.createElement(Section, {
+    tone: LOAD_OVER,
+    title: "Responsibilities dropped",
+    items: diff.removed.map(r => "\"" + r.label + "\" (was " + r.owner + ")")
+  }))))));
+}
+function GeneratorPanel({
+  func,
+  setFunc,
+  grain,
+  setGrain,
+  results,
+  onGenerate,
+  onAddOne,
+  onAddAll,
+  onDragStartItem,
+  onDragEndItem,
+  onClose
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed top-0 right-0 bottom-0 z-40 flex flex-col",
+    style: {
+      width: 348,
+      background: "#fff",
+      borderLeft: "1px solid " + COL_BORDER,
+      boxShadow: "-8px 0 30px rgba(0,0,0,.10)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 px-4 py-3",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#6B4FB8"
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-base",
+    style: {
+      color: SLATE
+    }
+  }, "Responsibilities generator")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    style: {
+      color: "#5B6B72"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-3",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-semibold mb-1",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Business function"), /*#__PURE__*/React.createElement("select", {
+    value: func,
+    onChange: e => setFunc(e.target.value),
+    className: "w-full rounded-md px-2 py-2 text-sm bg-white mb-3",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, FUNCTIONS.map(f => /*#__PURE__*/React.createElement("option", {
+    key: f,
+    value: f
+  }, f))), /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-semibold mb-1",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Granularity — ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: SLATE
+    }
+  }, GRAIN[grain - 1])), /*#__PURE__*/React.createElement("input", {
+    type: "range",
+    min: "1",
+    max: "4",
+    step: "1",
+    value: grain,
+    onChange: e => setGrain(parseInt(e.target.value)),
+    className: "w-full",
+    style: {
+      accentColor: "#6B4FB8"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between mt-1"
+  }, GRAIN.map((g, i) => /*#__PURE__*/React.createElement("span", {
+    key: g,
+    className: "text-[10px]",
+    style: {
+      color: grain === i + 1 ? "#6B4FB8" : "#9AA8AD",
+      fontWeight: grain === i + 1 ? 700 : 400
+    }
+  }, g))), /*#__PURE__*/React.createElement("button", {
+    onClick: onGenerate,
+    className: "ab-btn mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-md py-2.5",
+    style: {
+      background: "#6B4FB8",
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconSparkle, {
+    size: 16
+  }), " Generate")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto px-4 py-3"
+  }, results.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mt-4 text-center",
+    style: {
+      color: "#9AA8AD"
+    }
+  }, "Pick a function and granularity, then Generate. Drag a result onto a person, or tap + to drop it in Unassigned.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-semibold",
+    style: {
+      color: "#5B6B72"
+    }
+  }, results.length, " suggestions"), /*#__PURE__*/React.createElement("button", {
+    onClick: onAddAll,
+    className: "ab-btn text-xs font-medium",
+    style: {
+      color: TEAL
+    }
+  }, "Add all to Unassigned")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2"
+  }, results.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.id,
+    draggable: true,
+    onDragStart: () => onDragStartItem(item),
+    onDragEnd: onDragEndItem,
+    className: "ab-card group relative rounded-lg p-2.5 pr-9 cursor-grab active:cursor-grabbing",
+    style: {
+      background: "#fff",
+      border: "1px solid " + COL_BORDER,
+      borderLeft: "3px solid #6B4FB8"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mt-0.5 opacity-40 flex-shrink-0"
+  }, /*#__PURE__*/React.createElement(IconGrip, {
+    size: 14
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm leading-snug",
+    style: {
+      color: SLATE
+    }
+  }, item.desc)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onAddOne(item),
+    className: "ab-btn absolute top-1.5 right-1.5 p-1 rounded",
+    title: "Add to Unassigned",
+    style: {
+      background: "#F1ECFA",
+      color: "#6B4FB8"
+    }
+  }, /*#__PURE__*/React.createElement(IconPlus, {
+    size: 15
+  }))))))), /*#__PURE__*/React.createElement("div", {
+    className: "px-4 py-2 text-[11px]",
+    style: {
+      borderTop: "1px solid " + COL_BORDER,
+      color: "#9AA8AD"
+    }
+  }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice."));
+}
+function JDModal({
+  seat,
+  cards,
+  onClose
+}) {
+  const role = seat.role && seat.role.trim() || "this role";
+  const funcs = Array.from(new Set(cards.map(c => c.func && c.func.trim()).filter(Boolean)));
+  const area = funcs.length ? funcs.join(", ") : "the relevant area";
+  const owned = cards.map(c => c.desc).filter(Boolean);
+  const draft = "Boreal — " + role + "\n\n" + "About the role\n" + "Boreal is hiring a " + role + " to own a clear set of responsibilities with real accountability from day one. You'll work closely with the leadership team and own outcomes end to end.\n\n" + "What you'll own\n" + (owned.length ? owned.map(d => "• " + d).join("\n") : "• [Add the responsibilities this role will own]") + "\n\n" + "What we're looking for\n" + "• [X]+ years of experience in " + area + "\n" + "• A track record of owning outcomes, not just tasks\n" + "• [Add 2–3 role-specific skills or qualifications]\n\n" + "About Boreal\n" + "[One or two sentences about Boreal and the team this role joins.]\n\n" + "Details\n" + "[Location · employment type · compensation range" + (seat.cost > 0 ? " (target " + fmtMoney(seat.cost) + "/yr)" : "") + " · how to apply]";
+  const [text, setText] = useState(draft);
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    try {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch (e) {}
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(15,36,48,.45)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-2xl my-8",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement(IconDoc, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-base",
+    style: {
+      color: SLATE
+    }
+  }, "Job description — ", role)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    style: {
+      color: "#5B6B72"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mb-2",
+    style: {
+      color: "#5B6B72"
+    }
+  }, "Drafted from this role's responsibilities. Edit the bracketed parts, then copy it out."), /*#__PURE__*/React.createElement("textarea", {
+    value: text,
+    onChange: e => setText(e.target.value),
+    rows: 16,
+    className: "w-full rounded-lg px-3 py-2 text-sm",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE,
+      fontFamily: "ui-monospace, Menlo, monospace"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end gap-2 mt-3"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
+    style: {
+      color: "#5B6B72",
+      border: "1px solid " + COL_BORDER
+    }
+  }, "Close"), /*#__PURE__*/React.createElement("button", {
+    onClick: copy,
+    className: "ab-btn text-sm font-semibold rounded-md px-3 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, copied ? "Copied!" : "Copy")))));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));
+  } catch (err) {
+    abFail((err && err.message) ? err.message : String(err));
+    if (window.console) console.error(err);
+  }
+  }
+  </script>
+</body>
+</html>
