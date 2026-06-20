@@ -148,9 +148,9 @@ automatically.
   device**. Two people opening the same site will each keep their own copy.
 - **Sharing** is explicit and snapshot-based: a link or file you generate
   contains the plan at that moment. Anyone with the link/file can open it, so
-  treat them like any document you'd email. A downloaded file works for anyone;
-  opening a share **link** on this Pages site requires access to the (private)
-  repo, so the file is the most portable option until the hosted version exists.
+  treat them like any document you'd email. The site is **public**, so a share
+  **link** opens for anyone you send it to — no sign-in or repo access needed;
+  a downloaded file works the same way offline.
 - Nothing is sent to a server automatically. There is no account system and no
   live shared source of truth yet — that is intentional for a prototype.
 
