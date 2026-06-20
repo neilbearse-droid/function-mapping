@@ -611,6 +611,7 @@ function App() {
   const [commentTarget, setCommentTarget] = useState(null);
   const [suggestMode, setSuggestMode] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [offboard, setOffboard] = useState(null);
   const [party, setParty] = useState(0);
   const [author, setAuthor] = useState(loadName());
   useEffect(() => {
@@ -728,7 +729,17 @@ function App() {
       func: s.card.func,
       desc: s.card.desc,
       weight: s.card.weight
-    }]);
+    }]);else if (s.kind === "removeSeat") {
+      const alloc = s.allocation || {};
+      setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(alloc, c.id) ? {
+        ...c,
+        personId: alloc[c.id]
+      } : c.personId === s.seatId ? {
+        ...c,
+        personId: null
+      } : c));
+      setPeople(p => p.filter(x => x.id !== s.seatId));
+    }
     removeSuggestion(id);
   };
   const moveCard = (cardId, colId) => {
@@ -852,6 +863,44 @@ function App() {
       personId: null
     } : c));
     setPeople(p => p.filter(x => x.id !== id));
+  };
+  const requestDeleteSeat = id => {
+    const seat = view.people.find(p => p.id === id);
+    if (!seat) return;
+    const own = view.cards.filter(c => c.personId === id);
+    if (own.length === 0) {
+      if (suggestMode) addSuggestion({
+        kind: "removeSeat",
+        seatId: id,
+        seatLabel: colLabel(seat),
+        allocation: {}
+      });else deletePerson(id);
+      return;
+    }
+    setOffboard({
+      seatId: id
+    });
+  };
+  const applyOffboard = (id, allocation) => {
+    const seat = view.people.find(p => p.id === id);
+    if (suggestMode) {
+      addSuggestion({
+        kind: "removeSeat",
+        seatId: id,
+        seatLabel: seat ? colLabel(seat) : "Seat",
+        allocation: allocation
+      });
+    } else {
+      setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(allocation, c.id) ? {
+        ...c,
+        personId: allocation[c.id]
+      } : c.personId === id ? {
+        ...c,
+        personId: null
+      } : c));
+      setPeople(p => p.filter(x => x.id !== id));
+    }
+    setOffboard(null);
   };
   const addComment = (kind, id, text) => {
     const t = (text || "").trim();
@@ -1277,6 +1326,7 @@ function App() {
     const bg = isOver ? DROP_BG : vacant ? VACANT_BG : "#fff";
     const bc = isOver ? TEAL : vacant ? AMBER_BORDER : COL_BORDER;
     const bs = isOver || vacant ? "dashed" : "solid";
+    const seatSugg = !isUn && suggestions.find(s => s.kind === "removeSeat" && s.seatId === col.id);
     return /*#__PURE__*/React.createElement("div", {
       key: col.id,
       onDragOver: e => {
@@ -1297,7 +1347,7 @@ function App() {
         background: bg,
         border: "1px solid " + bc,
         borderStyle: bs,
-        boxShadow: isOver ? "0 8px 24px rgba(20,83,45,.16)" : "0 1px 2px rgba(16,40,24,.05), 0 1px 3px rgba(16,40,24,.04)"
+        boxShadow: seatSugg ? "0 0 0 2px " + LOAD_OVER : isOver ? "0 8px 24px rgba(20,83,45,.16)" : "0 1px 2px rgba(16,40,24,.05), 0 1px 3px rgba(16,40,24,.04)"
       }
     }, /*#__PURE__*/React.createElement(ColumnHeader, {
       col: col,
@@ -1308,14 +1358,17 @@ function App() {
       load: isUn ? 0 : seatLoad(col.id),
       keyRisk: !isUn && !vacant && keyRiskOf(col.id),
       onUpdate: updatePerson,
-      onDelete: deletePerson,
+      onDelete: requestDeleteSeat,
       onDraftJD: () => setJd({
         seatId: col.id
       }),
       onComments: () => setCommentTarget({
         kind: "seat",
         id: col.id
-      })
+      }),
+      seatSugg: seatSugg || null,
+      onAcceptSuggestion: acceptSuggestion,
+      onRejectSuggestion: removeSuggestion
     }), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-3",
       style: {
@@ -1429,7 +1482,20 @@ function App() {
       }));
     },
     onClose: () => setReviewOpen(false)
-  }), party > 0 && /*#__PURE__*/React.createElement(KonamiRain, {
+  }), offboard && (() => {
+    const seat = view.people.find(p => p.id === offboard.seatId);
+    if (!seat) return null;
+    return /*#__PURE__*/React.createElement(OffboardModal, {
+      seat: seat,
+      cards: view.cards.filter(c => c.personId === seat.id),
+      people: view.people.filter(p => p.id !== seat.id),
+      allCards: view.cards,
+      target: target,
+      suggestMode: suggestMode,
+      onConfirm: alloc => applyOffboard(seat.id, alloc),
+      onClose: () => setOffboard(null)
+    });
+  })(), party > 0 && /*#__PURE__*/React.createElement(KonamiRain, {
     key: party,
     onDone: () => setParty(0)
   }));
@@ -1486,9 +1552,13 @@ function SuggestionsModal({
       if ((s.before.desc || "") !== (s.patch.desc || "")) parts.push("“" + (s.patch.desc || "") + "”");
       return ["Edit", cardDesc(s.cardId), parts.join(" · ")];
     }
+    if (s.kind === "removeSeat") {
+      const n = Object.keys(s.allocation || {}).length;
+      return ["Remove seat", s.seatLabel || "Seat", n > 0 ? n + (n === 1 ? " responsibility reallocated" : " responsibilities reallocated") : "no responsibilities"];
+    }
     return ["Change", "", ""];
   };
-  const tint = k => k === "delete" ? LOAD_OVER : k === "add" ? TEAL : AMBER_TX;
+  const tint = k => k === "delete" || k === "removeSeat" ? LOAD_OVER : k === "add" ? TEAL : AMBER_TX;
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
@@ -2032,7 +2102,10 @@ function ColumnHeader({
   onUpdate,
   onDelete,
   onDraftJD,
-  onComments
+  onComments,
+  seatSugg,
+  onAcceptSuggestion,
+  onRejectSuggestion
 }) {
   const [editing, setEditing] = useState(col._new || false);
   const roleRef = useRef(null);
@@ -2234,7 +2307,7 @@ function ColumnHeader({
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => onDelete(col.id),
     className: "ab-btn p-1 rounded-full hover:bg-black/5",
-    title: "Remove (responsibilities move to Unassigned)",
+    title: "Remove seat & reallocate responsibilities",
     style: {
       color: "#9AA89E"
     }
@@ -2249,7 +2322,39 @@ function ColumnHeader({
     load: load,
     items: count,
     target: target
-  }));
+  }), seatSugg && /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 rounded-md px-2 py-1.5 text-[11px]",
+    style: {
+      background: "#FEE2E2",
+      color: LOAD_OVER,
+      border: "1px solid " + LOAD_OVER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 11
+  }), "Proposed removal"), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-80 flex-shrink-0"
+  }, seatSugg.author || "Someone")), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 mt-1.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => onAcceptSuggestion && onAcceptSuggestion(seatSugg.id),
+    className: "ab-btn rounded-full px-2 py-0.5 font-semibold",
+    style: {
+      background: LOAD_OVER,
+      color: "#fff"
+    }
+  }, "Accept"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onRejectSuggestion && onRejectSuggestion(seatSugg.id),
+    className: "ab-btn rounded-full px-2 py-0.5 font-semibold",
+    style: {
+      background: "#fff",
+      color: LOAD_OVER,
+      border: "1px solid " + LOAD_OVER
+    }
+  }, "Reject"))));
 }
 function Card({
   card,
@@ -2958,6 +3063,209 @@ function GeneratorPanel({
       color: "#9AA89E"
     }
   }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice.")));
+}
+function OffboardModal({
+  seat,
+  cards,
+  people,
+  allCards,
+  target,
+  suggestMode,
+  onConfirm,
+  onClose
+}) {
+  const [alloc, setAlloc] = useState(() => {
+    const o = {};
+    cards.forEach(c => {
+      o[c.id] = null;
+    });
+    return o;
+  });
+  const [moveAllVal, setMoveAllVal] = useState("");
+  const setOne = (cardId, v) => setAlloc(a => ({
+    ...a,
+    [cardId]: v === "" ? null : v
+  }));
+  const setAll = v => {
+    setMoveAllVal(v);
+    setAlloc(() => {
+      const o = {};
+      cards.forEach(c => {
+        o[c.id] = v === "" ? null : v;
+      });
+      return o;
+    });
+  };
+  const baseLoad = pid => allCards.filter(c => c.personId === pid).reduce((a, c) => a + cardWeight(c), 0);
+  const addedTo = pid => cards.filter(c => alloc[c.id] === pid).reduce((a, c) => a + cardWeight(c), 0);
+  const targets = people.filter(p => cards.some(c => alloc[c.id] === p.id));
+  const unassignedCount = cards.filter(c => !alloc[c.id]).length;
+  const opts = [/*#__PURE__*/React.createElement("option", {
+    key: "_un",
+    value: ""
+  }, "Unassigned"), ...people.map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, colLabel(p)))];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-lg my-8 flex flex-col",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)",
+      maxHeight: "85vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 min-w-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: LOAD_OVER
+    }
+  }, /*#__PURE__*/React.createElement(IconTrash, {
+    size: 17
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-base truncate",
+    style: {
+      color: SLATE
+    }
+  }, "Remove ", colLabel(seat))), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5 flex-shrink-0",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4 overflow-y-auto",
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm mb-3",
+    style: {
+      color: "#52635A"
+    }
+  }, "This seat owns ", cards.length, cards.length === 1 ? " responsibility" : " responsibilities", ". Choose where each one goes. Anything left as Unassigned stays in the Unassigned column."), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-3 flex-wrap"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-semibold",
+    style: {
+      color: "#52635A"
+    }
+  }, "Move all to"), /*#__PURE__*/React.createElement("select", {
+    value: moveAllVal,
+    onChange: e => setAll(e.target.value),
+    className: "rounded-md px-2 py-1 text-sm bg-white",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, opts)), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-2 mb-3"
+  }, cards.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    className: "flex items-center justify-between gap-3 rounded-lg px-3 py-2",
+    style: {
+      background: "#F7FAF7",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm truncate",
+    style: {
+      color: SLATE
+    }
+  }, c.desc && c.desc.trim() || "Untitled responsibility"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px]",
+    style: {
+      color: "#9AA89E"
+    }
+  }, (c.func && c.func.trim() || "Unfiled") + " · effort " + (c.weight || "M"))), /*#__PURE__*/React.createElement("select", {
+    value: alloc[c.id] || "",
+    onChange: e => setOne(c.id, e.target.value),
+    className: "rounded-md px-2 py-1 text-sm bg-white flex-shrink-0",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, opts.map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.key,
+    value: o.props.value
+  }, o.props.children)))))), (targets.length > 0 || unassignedCount > 0) && /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3",
+    style: {
+      background: "#F4F9F5",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold uppercase tracking-wide mb-2",
+    style: {
+      color: "#52635A"
+    }
+  }, "Resulting load"), targets.map(p => {
+    const rl = baseLoad(p.id) + addedTo(p.id);
+    const over = rl > target;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: "flex items-center justify-between gap-2 text-sm py-0.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: SLATE
+      }
+    }, colLabel(p)), /*#__PURE__*/React.createElement("span", {
+      className: "font-semibold flex items-center gap-1",
+      style: {
+        color: over ? LOAD_OVER : TEAL
+      }
+    }, rl, " / ", target, over && /*#__PURE__*/React.createElement("span", {
+      className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase"
+    }, /*#__PURE__*/React.createElement(IconWarn, {
+      size: 11
+    }), "over")));
+  }), unassignedCount > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 text-sm py-0.5"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#7C8B80"
+    }
+  }, "Unassigned"), /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold",
+    style: {
+      color: "#7C8B80"
+    }
+  }, unassignedCount, unassignedCount === 1 ? " responsibility" : " responsibilities")))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end gap-2 px-5 py-3",
+    style: {
+      borderTop: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: "#52635A",
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, "Cancel"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onConfirm(alloc),
+    className: "ab-btn text-sm font-semibold rounded-full px-4 py-2",
+    style: {
+      background: suggestMode ? AMBER_TX : LOAD_OVER,
+      color: "#fff"
+    }
+  }, suggestMode ? "Propose removal" : "Remove seat"))));
 }
 function AIJDModal({
   role,

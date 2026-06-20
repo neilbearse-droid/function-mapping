@@ -32,6 +32,11 @@ and propose changes for review.
   name blank to keep it an open role; add a name to turn it into a real teammate.
 - **Copy forward** — future views start from your real team via *Copy from
   Today* (and 12-month can copy from 6-month), so you plan from reality.
+- **Remove a seat with reallocation** — removing a seat that owns work opens a
+  short flow to **reassign each responsibility** (all to one person, or
+  case-by-case), with a **live load preview** so you don't overload whoever
+  picks them up. Anything you leave goes to Unassigned. Empty seats are removed
+  with no prompt.
 - **Unassigned column** — surfaces responsibilities nobody currently owns.
 
 ### Insight layer
@@ -87,12 +92,13 @@ all of it travels inside a shared plan.
   button or **⌘/Ctrl+Enter**, and delete your own.
 - **Suggestion mode** — toggle **Suggest** in the header to *propose* changes
   instead of applying them. While on, moving, editing, adding, and deleting a
-  responsibility are recorded as **proposals** signed with your name, not changes
+  responsibility — and **removing a seat** (the reallocation plan rides along with
+  the proposal) — are recorded as **proposals** signed with your name, not changes
   to the board. Proposals render inline — an amber (or red, for removals) ring and
-  an **Accept / Reject** banner on the affected card, and dashed **ghost cards**
-  for proposed additions. A **"N proposed"** pill opens a review modal to accept
-  or reject each one, or **Accept all / Reject all**. Great for a reviewer who
-  wants to weigh in without overwriting the owner's work.
+  an **Accept / Reject** banner on the affected card or seat, and dashed **ghost
+  cards** for proposed additions. A **"N proposed"** pill opens a review modal to
+  accept or reject each one, or **Accept all / Reject all**. Great for a reviewer
+  who wants to weigh in without overwriting the owner's work.
 
 ---
 
