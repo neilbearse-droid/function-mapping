@@ -612,6 +612,7 @@ function App() {
   const [suggestMode, setSuggestMode] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [offboard, setOffboard] = useState(null);
+  const [undo, setUndo] = useState(null);
   const [party, setParty] = useState(0);
   const [author, setAuthor] = useState(loadName());
   useEffect(() => {
@@ -864,6 +865,24 @@ function App() {
     } : c));
     setPeople(p => p.filter(x => x.id !== id));
   };
+  const removeSeatNow = (id, allocation) => {
+    const seat = view.people.find(p => p.id === id);
+    const snap = view;
+    setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(allocation, c.id) ? {
+      ...c,
+      personId: allocation[c.id]
+    } : c.personId === id ? {
+      ...c,
+      personId: null
+    } : c));
+    setPeople(p => p.filter(x => x.id !== id));
+    setUndo({
+      label: "Removed " + (seat ? colLabel(seat) : "seat"),
+      tab: tab,
+      snapshot: snap,
+      ts: Date.now()
+    });
+  };
   const requestDeleteSeat = id => {
     const seat = view.people.find(p => p.id === id);
     if (!seat) return;
@@ -874,7 +893,7 @@ function App() {
         seatId: id,
         seatLabel: colLabel(seat),
         allocation: {}
-      });else deletePerson(id);
+      });else removeSeatNow(id, {});
       return;
     }
     setOffboard({
@@ -891,14 +910,7 @@ function App() {
         allocation: allocation
       });
     } else {
-      setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(allocation, c.id) ? {
-        ...c,
-        personId: allocation[c.id]
-      } : c.personId === id ? {
-        ...c,
-        personId: null
-      } : c));
-      setPeople(p => p.filter(x => x.id !== id));
+      removeSeatNow(id, allocation);
     }
     setOffboard(null);
   };
@@ -1495,10 +1507,56 @@ function App() {
       onConfirm: alloc => applyOffboard(seat.id, alloc),
       onClose: () => setOffboard(null)
     });
-  })(), party > 0 && /*#__PURE__*/React.createElement(KonamiRain, {
+  })(), undo && /*#__PURE__*/React.createElement(UndoToast, {
+    key: undo.ts,
+    label: undo.label,
+    onUndo: () => {
+      setViews(v => ({
+        ...v,
+        [undo.tab]: undo.snapshot
+      }));
+      setUndo(null);
+    },
+    onClose: () => setUndo(null)
+  }), party > 0 && /*#__PURE__*/React.createElement(KonamiRain, {
     key: party,
     onDone: () => setParty(0)
   }));
+}
+function UndoToast({
+  label,
+  onUndo,
+  onClose
+}) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 8000);
+    return () => clearTimeout(t);
+  }, []);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed left-1/2 bottom-6 flex items-center gap-3 rounded-full px-4 py-2.5 text-sm",
+    style: {
+      transform: "translateX(-50%)",
+      background: "#14532D",
+      color: "#fff",
+      boxShadow: "0 12px 30px rgba(0,0,0,.3)",
+      zIndex: 70
+    }
+  }, /*#__PURE__*/React.createElement("span", null, label), /*#__PURE__*/React.createElement("button", {
+    onClick: onUndo,
+    className: "ab-btn font-bold rounded-full px-2.5 py-0.5",
+    style: {
+      background: "#fff",
+      color: "#14532D"
+    }
+  }, "Undo"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-0.5 rounded-full",
+    style: {
+      color: "rgba(255,255,255,.7)"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 15
+  })));
 }
 function KonamiRain({
   onDone
@@ -3098,6 +3156,7 @@ function OffboardModal({
   };
   const baseLoad = pid => allCards.filter(c => c.personId === pid).reduce((a, c) => a + cardWeight(c), 0);
   const addedTo = pid => cards.filter(c => alloc[c.id] === pid).reduce((a, c) => a + cardWeight(c), 0);
+  const heavyAfter = pid => allCards.filter(c => c.personId === pid && c.weight === "L").length + cards.filter(c => alloc[c.id] === pid && c.weight === "L").length;
   const targets = people.filter(p => cards.some(c => alloc[c.id] === p.id));
   const unassignedCount = cards.filter(c => !alloc[c.id]).length;
   const opts = [/*#__PURE__*/React.createElement("option", {
@@ -3217,6 +3276,7 @@ function OffboardModal({
   }, "Resulting load"), targets.map(p => {
     const rl = baseLoad(p.id) + addedTo(p.id);
     const over = rl > target;
+    const kp = !isVacant(p) && heavyAfter(p.id) >= 2;
     return /*#__PURE__*/React.createElement("div", {
       key: p.id,
       className: "flex items-center justify-between gap-2 text-sm py-0.5"
@@ -3233,7 +3293,14 @@ function OffboardModal({
       className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase"
     }, /*#__PURE__*/React.createElement(IconWarn, {
       size: 11
-    }), "over")));
+    }), "over"), kp && /*#__PURE__*/React.createElement("span", {
+      className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase",
+      style: {
+        color: LOAD_OVER
+      }
+    }, /*#__PURE__*/React.createElement(IconWarn, {
+      size: 11
+    }), "key-person")));
   }), unassignedCount > 0 && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-2 text-sm py-0.5"
   }, /*#__PURE__*/React.createElement("span", {

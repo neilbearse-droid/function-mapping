@@ -34,9 +34,10 @@ and propose changes for review.
   Today* (and 12-month can copy from 6-month), so you plan from reality.
 - **Remove a seat with reallocation** — removing a seat that owns work opens a
   short flow to **reassign each responsibility** (all to one person, or
-  case-by-case), with a **live load preview** so you don't overload whoever
-  picks them up. Anything you leave goes to Unassigned. Empty seats are removed
-  with no prompt.
+  case-by-case), with a **live load preview** that flags both **overload** and
+  **key-person risk** on whoever picks them up. Anything you leave goes to
+  Unassigned, and a removal can be **undone** from the toast that appears. Empty
+  seats are removed with no prompt.
 - **Unassigned column** — surfaces responsibilities nobody currently owns.
 
 ### Insight layer
