@@ -59,6 +59,34 @@ const WEIGHT = {
 };
 const WEIGHTS = ["S", "M", "L"];
 const uid = () => Math.random().toString(36).slice(2, 9);
+const encodePlan = data => {
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  } catch (e) {
+    return "";
+  }
+};
+const decodePlan = str => {
+  try {
+    const d = JSON.parse(decodeURIComponent(escape(atob(str))));
+    return d && d.views ? d : null;
+  } catch (e) {
+    return null;
+  }
+};
+const NAME_KEY = "forester-author";
+const loadName = () => {
+  try {
+    return localStorage.getItem(NAME_KEY) || "";
+  } catch (e) {
+    return "";
+  }
+};
+const saveName = n => {
+  try {
+    localStorage.setItem(NAME_KEY, n || "");
+  } catch (e) {}
+};
 const norm = s => (s || "").trim().toLowerCase();
 const isVacant = p => !p.name || !p.name.trim();
 const cardWeight = c => WEIGHT[c.weight] || 2;
@@ -247,6 +275,21 @@ const IconCopy = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/Reac
   rx: "2"
 }), /*#__PURE__*/React.createElement("path", {
   d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+}));
+const IconShare = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
+  cx: "18",
+  cy: "5",
+  r: "3"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "6",
+  cy: "12",
+  r: "3"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "18",
+  cy: "19",
+  r: "3"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"
 }));
 const IconRoute = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
   cx: "6",
@@ -470,6 +513,27 @@ function App() {
   const [genDrag, setGenDrag] = useState(null);
   const [groupBy, setGroupBy] = useState("person");
   const [jd, setJd] = useState(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [author, setAuthor] = useState(loadName());
+  useEffect(() => {
+    saveName(author);
+  }, [author]);
+  useEffect(() => {
+    const m = (window.location.hash || "").match(/[#&]plan=([^&]+)/);
+    if (!m) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    const data = decodePlan(m[1]);
+    if (!data) {
+      window.alert("That shared link could not be read — it may be incomplete.");
+      return;
+    }
+    const who = data.sharedBy ? " shared by " + data.sharedBy : "";
+    if (window.confirm("Load the plan" + who + "? This replaces what's currently on this device.")) {
+      setViews(data.views);
+      if (data.tab) setTab(data.tab);
+      if (data.meta) setMeta(data.meta);
+    }
+  }, []);
   const [vw, setVw] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
@@ -734,6 +798,16 @@ function App() {
   }, /*#__PURE__*/React.createElement(IconUserPlus, {
     size: 16
   }), " ", tab === "today" ? "Add teammate" : "Add role"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShareOpen(true),
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + TEAL,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconShare, {
+    size: 15
+  }), " Share"), /*#__PURE__*/React.createElement("button", {
     onClick: resetAll,
     className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
     style: {
@@ -991,7 +1065,254 @@ function App() {
       cards: cardsFor(seat.id),
       onClose: () => setJd(null)
     });
-  })());
+  })(), shareOpen && /*#__PURE__*/React.createElement(ShareModal, {
+    views: views,
+    tab: tab,
+    meta: meta,
+    author: author,
+    setAuthor: setAuthor,
+    onImport: data => {
+      setViews(data.views);
+      if (data.tab) setTab(data.tab);
+      if (data.meta) setMeta(data.meta);
+      setShareOpen(false);
+    },
+    onClose: () => setShareOpen(false)
+  }));
+}
+function ShareModal({
+  views,
+  tab,
+  meta,
+  author,
+  setAuthor,
+  onImport,
+  onClose
+}) {
+  const [copied, setCopied] = useState(false);
+  const [importText, setImportText] = useState("");
+  const fileRef = useRef(null);
+  const payload = {
+    v: 1,
+    sharedBy: (author || "").trim(),
+    sharedAt: Date.now(),
+    views,
+    tab,
+    meta
+  };
+  const link = (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "") + "#plan=" + encodePlan(payload);
+  const doCopy = () => {
+    const ok = () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    };
+    try {
+      navigator.clipboard.writeText(link).then(ok, () => window.prompt("Copy this link:", link));
+    } catch (e) {
+      window.prompt("Copy this link:", link);
+    }
+  };
+  const doDownload = () => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "forester-plan.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const confirmLoad = data => {
+    const who = data.sharedBy ? " shared by " + data.sharedBy : "";
+    if (window.confirm("Load the plan" + who + "? This replaces what's currently on this device.")) onImport(data);
+  };
+  const loadFromText = () => {
+    const t = importText.trim();
+    if (!t) return;
+    const code = t.indexOf("plan=") >= 0 ? t.split("plan=")[1].split("&")[0].trim() : t;
+    const data = decodePlan(code);
+    if (!data) {
+      window.alert("That doesn't look like a valid Forester share link or code.");
+      return;
+    }
+    confirmLoad(data);
+  };
+  const loadFromFile = e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data = null;
+      try {
+        const d = JSON.parse(reader.result);
+        data = d && d.views ? d : null;
+      } catch (er) {}
+      if (!data) {
+        window.alert("That file isn't a valid Forester plan.");
+        return;
+      }
+      confirmLoad(data);
+    };
+    reader.readAsText(f);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "rounded-xl bg-white w-full max-w-lg my-8",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      boxShadow: "0 20px 60px rgba(0,0,0,.25)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: TEAL
+    }
+  }, /*#__PURE__*/React.createElement(IconShare, {
+    size: 18
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "text-base font-semibold",
+    style: {
+      color: SLATE
+    }
+  }, "Share this plan")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4 flex flex-col gap-5"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-semibold mb-1",
+    style: {
+      color: "#52635A"
+    }
+  }, "Your name"), /*#__PURE__*/React.createElement("input", {
+    value: author,
+    onChange: e => setAuthor(e.target.value),
+    placeholder: "e.g. Alex (CEO)",
+    className: "w-full rounded-full px-3 py-2 text-sm",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mt-1",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "Shown to teammates when they open your shared plan.")), /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3",
+    style: {
+      background: "#F4F9F5",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-semibold mb-1",
+    style: {
+      color: SLATE
+    }
+  }, "Send a snapshot"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mb-3",
+    style: {
+      color: "#52635A"
+    }
+  }, "Whoever opens the link or file gets an editable copy on their device. This is a snapshot, not live sync — shared editing arrives with the backend."), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: doCopy,
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(copied ? IconCheck : IconCopy, {
+    size: 15
+  }), copied ? " Copied!" : " Copy share link"), /*#__PURE__*/React.createElement("button", {
+    onClick: doDownload,
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconDoc, {
+    size: 15
+  }), " Download file")), /*#__PURE__*/React.createElement("textarea", {
+    readOnly: true,
+    value: link,
+    onFocus: e => e.target.select(),
+    rows: 2,
+    className: "w-full mt-3 rounded-lg px-2 py-1.5 text-xs",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: "#52635A",
+      resize: "none",
+      wordBreak: "break-all"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-semibold mb-1",
+    style: {
+      color: SLATE
+    }
+  }, "Open a shared plan"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mb-2",
+    style: {
+      color: "#52635A"
+    }
+  }, "Paste a share link or code, or import a downloaded file. This replaces your current board."), /*#__PURE__*/React.createElement("textarea", {
+    value: importText,
+    onChange: e => setImportText(e.target.value),
+    placeholder: "Paste a Forester share link or code…",
+    rows: 2,
+    className: "w-full rounded-lg px-2 py-1.5 text-xs",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 mt-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: loadFromText,
+    disabled: !importText.trim(),
+    className: "ab-btn text-sm font-semibold rounded-full px-3 py-2 disabled:opacity-40",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, "Load plan"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => fileRef.current && fileRef.current.click(),
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, "Import file…"), /*#__PURE__*/React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: "application/json,.json",
+    onChange: loadFromFile,
+    className: "hidden"
+  }))))));
 }
 function LoadBar({
   load,
