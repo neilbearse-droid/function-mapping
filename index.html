@@ -295,6 +295,9 @@ const IconCopy = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/Reac
 const IconComment = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
   d: "M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.4A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z"
 }));
+const IconFlag = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M4 22V4M4 4h13l-2 4 2 4H4"
+}));
 const IconShare = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
   cx: "18",
   cy: "5",
@@ -534,6 +537,8 @@ function App() {
   const [jd, setJd] = useState(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [commentTarget, setCommentTarget] = useState(null);
+  const [suggestMode, setSuggestMode] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [author, setAuthor] = useState(loadName());
   useEffect(() => {
     saveName(author);
@@ -600,10 +605,65 @@ function App() {
     ...c,
     func: fn === "Unfiled" ? "" : fn
   } : c));
-  const moveCard = (cardId, colId) => setCards(cs => cs.map(c => c.id === cardId ? {
-    ...c,
-    personId: colId === UNASSIGNED ? null : colId
-  } : c));
+  const suggestions = view.suggestions || [];
+  const authorName = () => (author || "").trim() || "Someone";
+  const addSuggestion = s => setView(vw => ({
+    ...vw,
+    suggestions: [...(vw.suggestions || []), {
+      id: uid(),
+      author: authorName(),
+      ts: Date.now(),
+      ...s
+    }]
+  }));
+  const removeSuggestion = id => setView(vw => ({
+    ...vw,
+    suggestions: (vw.suggestions || []).filter(s => s.id !== id)
+  }));
+  const acceptSuggestion = id => {
+    const s = (view.suggestions || []).find(x => x.id === id);
+    if (!s) return;
+    if (s.kind === "move") setCards(cs => cs.map(c => c.id === s.cardId ? {
+      ...c,
+      personId: s.to
+    } : c));else if (s.kind === "delete") setCards(cs => cs.filter(c => c.id !== s.cardId));else if (s.kind === "edit") setCards(cs => cs.map(c => c.id === s.cardId ? {
+      ...c,
+      func: s.patch.func,
+      desc: s.patch.desc,
+      weight: s.patch.weight
+    } : c));else if (s.kind === "add") setCards(cs => [...cs, {
+      id: uid(),
+      personId: s.card.personId,
+      func: s.card.func,
+      desc: s.card.desc,
+      weight: s.card.weight
+    }]);
+    removeSuggestion(id);
+  };
+  const moveCard = (cardId, colId) => {
+    const to = colId === UNASSIGNED ? null : colId;
+    if (suggestMode) {
+      const card = view.cards.find(c => c.id === cardId);
+      if (!card || (card.personId || null) === to) return;
+      setView(vw => ({
+        ...vw,
+        suggestions: [...(vw.suggestions || []).filter(s => !(s.kind === "move" && s.cardId === cardId)), {
+          id: uid(),
+          author: authorName(),
+          ts: Date.now(),
+          kind: "move",
+          cardId,
+          to,
+          from: card.personId || null
+        }]
+      }));
+      return;
+    }
+    setCards(cs => cs.map(c => c.id === cardId ? {
+      ...c,
+      personId: to
+    } : c));
+  };
   const addCard = colId => setCards(cs => [...cs, {
     id: uid(),
     personId: colId === UNASSIGNED ? null : colId,
@@ -612,11 +672,61 @@ function App() {
     weight: "M",
     _new: true
   }]);
-  const updateCard = (id, patch) => setCards(cs => cs.map(c => c.id === id ? {
-    ...c,
-    ...patch
-  } : c));
-  const deleteCard = id => setCards(cs => cs.filter(c => c.id !== id));
+  const updateCard = (id, patch) => {
+    if (suggestMode) {
+      const card = view.cards.find(c => c.id === id);
+      if (card) {
+        if (card._new) {
+          if ((patch.func || "").trim() || (patch.desc || "").trim()) addSuggestion({
+            kind: "add",
+            card: {
+              personId: card.personId || null,
+              func: patch.func || "",
+              desc: patch.desc || "",
+              weight: patch.weight || "M"
+            }
+          });
+          setCards(cs => cs.filter(c => c.id !== id));
+          return;
+        }
+        const changed = ["func", "desc", "weight"].some(k => k in patch && (patch[k] || "") !== (card[k] || ""));
+        if (changed) addSuggestion({
+          kind: "edit",
+          cardId: id,
+          patch: {
+            func: patch.func,
+            desc: patch.desc,
+            weight: patch.weight
+          },
+          before: {
+            func: card.func || "",
+            desc: card.desc || "",
+            weight: card.weight || "M"
+          }
+        });
+        return;
+      }
+    }
+    setCards(cs => cs.map(c => c.id === id ? {
+      ...c,
+      ...patch
+    } : c));
+  };
+  const deleteCard = id => {
+    if (suggestMode) {
+      const card = view.cards.find(c => c.id === id);
+      if (card && !card._new) {
+        addSuggestion({
+          kind: "delete",
+          cardId: id,
+          desc: card.desc || "",
+          func: card.func || ""
+        });
+        return;
+      }
+    }
+    setCards(cs => cs.filter(c => c.id !== id));
+  };
   const addGenerated = (payload, colId) => setCards(cs => [...cs, {
     id: uid(),
     personId: colId === UNASSIGNED ? null : colId,
@@ -850,6 +960,31 @@ function App() {
   }, /*#__PURE__*/React.createElement(IconShare, {
     size: 15
   }), " Share"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSuggestMode(m => !m),
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
+    style: suggestMode ? {
+      color: "#fff",
+      background: AMBER_TX,
+      border: "1px solid " + AMBER_TX
+    } : {
+      color: AMBER_TX,
+      border: "1px solid " + AMBER_TX,
+      background: "#fff"
+    },
+    title: "Propose changes for review instead of applying them directly"
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 15
+  }), suggestMode ? " Suggesting" : " Suggest"), suggestions.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setReviewOpen(true),
+    className: "ab-btn flex items-center gap-1.5 text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      color: AMBER_TX,
+      background: AMBER_PILL,
+      border: "1px solid " + AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 14
+  }), " ", suggestions.length, " proposed"), /*#__PURE__*/React.createElement("button", {
     onClick: resetAll,
     className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
     style: {
@@ -862,7 +997,26 @@ function App() {
     style: {
       color: "#52635A"
     }
-  }, SUBTITLE[tab]), /*#__PURE__*/React.createElement("div", {
+  }, SUBTITLE[tab]), suggestMode && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 flex-wrap rounded-lg px-3 py-2 mb-4 text-sm",
+    style: {
+      background: AMBER_PILL,
+      border: "1px solid " + AMBER_TX,
+      color: AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 15
+  }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Suggestion mode."), " Moves, edits, adds and deletes are proposed for review — not applied. Signed as ", /*#__PURE__*/React.createElement("strong", null, authorName()), ".")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSuggestMode(false),
+    className: "ab-btn font-semibold rounded-full px-3 py-1",
+    style: {
+      background: "#fff",
+      color: AMBER_TX,
+      border: "1px solid " + AMBER_TX
+    }
+  }, "Done")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-3 flex-wrap mb-5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2 flex-wrap"
@@ -1005,7 +1159,11 @@ function App() {
       onComments: () => setCommentTarget({
         kind: "card",
         id: card.id
-      })
+      }),
+      suggestions: suggestions.filter(s => s.cardId === card.id),
+      labelFor: personLabel,
+      onAcceptSuggestion: acceptSuggestion,
+      onRejectSuggestion: removeSuggestion
     }))));
   })) : /*#__PURE__*/React.createElement("div", {
     className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
@@ -1079,7 +1237,16 @@ function App() {
       onComments: () => setCommentTarget({
         kind: "card",
         id: card.id
-      })
+      }),
+      suggestions: suggestions.filter(s => s.cardId === card.id),
+      labelFor: personLabel,
+      onAcceptSuggestion: acceptSuggestion,
+      onRejectSuggestion: removeSuggestion
+    })), suggestions.filter(s => s.kind === "add" && (s.card.personId || UNASSIGNED) === col.id).map(s => /*#__PURE__*/React.createElement(GhostCard, {
+      key: s.id,
+      sugg: s,
+      onAccept: () => acceptSuggestion(s.id),
+      onReject: () => removeSuggestion(s.id)
     }))), /*#__PURE__*/React.createElement("button", {
       onClick: () => addCard(col.id),
       className: "ab-btn mt-3 w-full flex items-center justify-center gap-1 text-sm font-medium rounded-full py-2",
@@ -1146,7 +1313,175 @@ function App() {
       onDelete: cid => deleteComment(commentTarget.kind, commentTarget.id, cid),
       onClose: () => setCommentTarget(null)
     });
-  })());
+  })(), reviewOpen && /*#__PURE__*/React.createElement(SuggestionsModal, {
+    suggestions: suggestions,
+    cards: view.cards,
+    labelFor: personLabel,
+    onAccept: acceptSuggestion,
+    onReject: removeSuggestion,
+    onAcceptAll: () => suggestions.forEach(s => acceptSuggestion(s.id)),
+    onRejectAll: () => {
+      if (window.confirm("Discard all " + suggestions.length + " proposed changes?")) setView(vw => ({
+        ...vw,
+        suggestions: []
+      }));
+    },
+    onClose: () => setReviewOpen(false)
+  }));
+}
+function SuggestionsModal({
+  suggestions,
+  cards,
+  labelFor,
+  onAccept,
+  onReject,
+  onAcceptAll,
+  onRejectAll,
+  onClose
+}) {
+  const cardDesc = id => {
+    const c = (cards || []).find(x => x.id === id);
+    return c ? c.desc && c.desc.trim() || "Untitled responsibility" : "(removed)";
+  };
+  const weightWord = x => x === "S" ? "light" : x === "L" ? "heavy" : "standard";
+  const lines = s => {
+    if (s.kind === "move") return ["Move", cardDesc(s.cardId), "→ " + labelFor(s.to)];
+    if (s.kind === "delete") return ["Remove", s.desc && s.desc.trim() || cardDesc(s.cardId), ""];
+    if (s.kind === "add") return ["Add", s.card.desc && s.card.desc.trim() || "New responsibility", "to " + labelFor(s.card.personId || null) + (s.card.func ? " · " + s.card.func : "")];
+    if (s.kind === "edit") {
+      const parts = [];
+      if ((s.before.func || "") !== (s.patch.func || "")) parts.push("function → " + (s.patch.func || "—"));
+      if ((s.before.weight || "M") !== (s.patch.weight || "M")) parts.push("effort → " + weightWord(s.patch.weight));
+      if ((s.before.desc || "") !== (s.patch.desc || "")) parts.push("“" + (s.patch.desc || "") + "”");
+      return ["Edit", cardDesc(s.cardId), parts.join(" · ")];
+    }
+    return ["Change", "", ""];
+  };
+  const tint = k => k === "delete" ? LOAD_OVER : k === "add" ? TEAL : AMBER_TX;
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "rounded-xl bg-white w-full max-w-lg my-8 flex flex-col",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+      maxHeight: "82vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "text-base font-semibold",
+    style: {
+      color: SLATE
+    }
+  }, "Proposed changes (", suggestions.length, ")")), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-3 overflow-y-auto flex flex-col gap-2",
+    style: {
+      flex: 1
+    }
+  }, suggestions.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm italic py-6 text-center",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "No proposed changes.") : suggestions.map(s => {
+    const L = lines(s);
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      className: "rounded-lg p-3 flex items-start justify-between gap-3",
+      style: {
+        background: "#F7FAF7",
+        border: "1px solid " + COL_BORDER
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "min-w-0"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 mb-0.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5",
+      style: {
+        background: "#fff",
+        color: tint(s.kind),
+        border: "1px solid " + tint(s.kind)
+      }
+    }, L[0]), /*#__PURE__*/React.createElement("span", {
+      className: "text-sm font-semibold truncate",
+      style: {
+        color: SLATE
+      }
+    }, L[1])), L[2] && /*#__PURE__*/React.createElement("div", {
+      className: "text-xs",
+      style: {
+        color: "#52635A"
+      }
+    }, L[2]), /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] mt-1",
+      style: {
+        color: "#9AA89E"
+      }
+    }, "by ", s.author || "Someone", " · ", relTime(s.ts))), /*#__PURE__*/React.createElement("div", {
+      className: "flex flex-col gap-1 flex-shrink-0"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => onAccept(s.id),
+      className: "ab-btn rounded-full px-3 py-1 text-xs font-semibold",
+      style: {
+        background: TEAL,
+        color: "#fff"
+      }
+    }, "Accept"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => onReject(s.id),
+      className: "ab-btn rounded-full px-3 py-1 text-xs font-semibold",
+      style: {
+        color: "#52635A",
+        border: "1px solid " + COL_BORDER,
+        background: "#fff"
+      }
+    }, "Reject")));
+  })), suggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-3 flex justify-end gap-2",
+    style: {
+      borderTop: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onRejectAll,
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: "#52635A",
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, "Reject all"), /*#__PURE__*/React.createElement("button", {
+    onClick: onAcceptAll,
+    className: "ab-btn text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, "Accept all"))));
 }
 function CommentsModal({
   title,
@@ -1796,9 +2131,26 @@ function Card({
   onMove,
   onUpdate,
   onDelete,
-  onComments
+  onComments,
+  suggestions,
+  labelFor,
+  onAcceptSuggestion,
+  onRejectSuggestion
 }) {
   const [editing, setEditing] = useState(card._new || false);
+  const suggs = suggestions || [];
+  const hasDelete = suggs.some(s => s.kind === "delete");
+  const ringColor = suggs.length ? hasDelete ? LOAD_OVER : AMBER_TX : null;
+  const weightWord = x => x === "S" ? "light" : x === "L" ? "heavy" : "standard";
+  const describe = s => s.kind === "move" ? "Proposed move → " + (labelFor ? labelFor(s.to) : "elsewhere") : s.kind === "delete" ? "Proposed removal" : s.kind === "edit" ? "Proposed edit" : "Proposed change";
+  const editDetail = s => {
+    if (s.kind !== "edit" || !s.before) return "";
+    const parts = [];
+    if ((s.before.func || "") !== (s.patch.func || "")) parts.push("Function → " + (s.patch.func || "—"));
+    if ((s.before.weight || "M") !== (s.patch.weight || "M")) parts.push("Effort → " + weightWord(s.patch.weight));
+    if ((s.before.desc || "") !== (s.patch.desc || "")) parts.push("“" + (s.patch.desc || "") + "”");
+    return parts.join(" · ");
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [weight, setWeight] = useState(card.weight || "M");
   const funcRef = useRef(null);
@@ -1894,7 +2246,9 @@ function Card({
     className: "ab-card group relative rounded-lg p-3 cursor-grab active:cursor-grabbing " + (dragging ? "ab-dragging" : ""),
     style: {
       background: TEAL,
-      color: "#fff"
+      color: "#fff",
+      boxShadow: ringColor ? "0 0 0 2px " + ringColor : undefined,
+      opacity: hasDelete ? 0.85 : 1
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-start gap-2"
@@ -1998,7 +2352,87 @@ function Card({
       },
       className: "ab-btn w-full text-left px-3 py-1.5 hover:bg-black/5 disabled:opacity-40"
     }, colLabel(col), here && " (current)");
-  })));
+  })), suggs.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1.5 mt-2"
+  }, suggs.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    className: "rounded-md px-2 py-1.5 text-[11px]",
+    style: {
+      background: "rgba(255,255,255,.16)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-semibold flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 11
+  }), describe(s)), /*#__PURE__*/React.createElement("span", {
+    className: "opacity-80 flex-shrink-0"
+  }, s.author || "Someone")), s.kind === "edit" && editDetail(s) && /*#__PURE__*/React.createElement("div", {
+    className: "opacity-90 mt-0.5"
+  }, editDetail(s)), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 mt-1.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => onAcceptSuggestion && onAcceptSuggestion(s.id),
+    className: "ab-btn rounded-full px-2 py-0.5 font-semibold",
+    style: {
+      background: "#fff",
+      color: TEAL
+    }
+  }, "Accept"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onRejectSuggestion && onRejectSuggestion(s.id),
+    className: "ab-btn rounded-full px-2 py-0.5 font-semibold",
+    style: {
+      background: "rgba(255,255,255,.2)",
+      color: "#fff"
+    }
+  }, "Reject"))))));
+}
+function GhostCard({
+  sugg,
+  onAccept,
+  onReject
+}) {
+  const s = sugg;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3",
+    style: {
+      background: AMBER_PILL,
+      border: "1px dashed " + AMBER_TX,
+      color: AMBER_TX
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide mb-1"
+  }, /*#__PURE__*/React.createElement(IconFlag, {
+    size: 12
+  }), " Proposed responsibility"), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-bold"
+  }, "Function: ", s.card.func || "—"), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm leading-snug mt-0.5"
+  }, s.card.desc || /*#__PURE__*/React.createElement("span", {
+    className: "italic opacity-70"
+  }, "No description")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 mt-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] opacity-80"
+  }, s.author || "Someone"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onAccept,
+    className: "ab-btn rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+    style: {
+      background: AMBER_TX,
+      color: "#fff"
+    }
+  }, "Accept"), /*#__PURE__*/React.createElement("button", {
+    onClick: onReject,
+    className: "ab-btn rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+    style: {
+      background: "#fff",
+      color: AMBER_TX,
+      border: "1px solid " + AMBER_TX
+    }
+  }, "Reject"))));
 }
 function TransitionPlan({
   views,
