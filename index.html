@@ -9,12 +9,13 @@
   <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
   <style>
-    body { background:#EEF2F3; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    .ab-card { transition: box-shadow .15s ease, transform .15s ease; }
-    .ab-card:hover { box-shadow: 0 6px 18px rgba(21,76,102,.22); }
+    body { background:#FFFFFF; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#10231A; }
+    .ab-card { transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
+    .ab-card:hover { box-shadow: 0 6px 18px rgba(20,83,45,.18); }
     .ab-dragging { opacity:.4; }
-    .ab-btn:focus-visible, .ab-card:focus-visible { outline: 2px solid #1B5E7E; outline-offset: 2px; }
-    #ab-error { display:none; max-width:640px; margin:40px auto; padding:20px 24px; border:1px solid #E6C98F; background:#FCF8F1; border-radius:12px; color:#7a4a00; font-size:14px; line-height:1.5; }
+    .ab-btn { transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease; }
+    .ab-btn:focus-visible, .ab-card:focus-visible { outline: 2px solid #15803D; outline-offset: 2px; }
+    #ab-error { display:none; max-width:640px; margin:40px auto; padding:20px 24px; border:1px solid #F6D27A; background:#FFFBEB; border-radius:12px; color:#92400E; font-size:14px; line-height:1.5; }
   </style>
 </head>
 <body>
@@ -37,17 +38,17 @@ const {
   useRef,
   useEffect
 } = React;
-const TEAL = "#1B5E7E";
-const PAGE_BG = "#EEF2F3";
-const COL_BORDER = "#DCE3E5";
-const SLATE = "#0F2430";
-const DROP_BG = "#E7F1F5";
-const AMBER_TX = "#9A5B00";
-const AMBER_PILL = "#FBEBCF";
-const AMBER_BORDER = "#E6C98F";
-const VACANT_BG = "#FCF8F1";
-const LOAD_WARN = "#C2780E";
-const LOAD_OVER = "#C0392B";
+const TEAL = "#15803D";
+const PAGE_BG = "#FFFFFF";
+const COL_BORDER = "#DCE7DD";
+const SLATE = "#10231A";
+const DROP_BG = "#DCFCE7";
+const AMBER_TX = "#92400E";
+const AMBER_PILL = "#FEF3C7";
+const AMBER_BORDER = "#F6D27A";
+const VACANT_BG = "#FFFBEB";
+const LOAD_WARN = "#D97706";
+const LOAD_OVER = "#DC2626";
 const UNASSIGNED = "__unassigned__";
 const STORE_KEY = "boreal-accountability-v2";
 const DEFAULT_TARGET = 5;
@@ -631,7 +632,7 @@ function App() {
     }
   }, val), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, label));
   return /*#__PURE__*/React.createElement("div", {
@@ -648,18 +649,21 @@ function App() {
       transition: "padding .2s ease"
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3 mb-5"
+    className: "flex items-center gap-3 mb-5 pb-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
   }, /*#__PURE__*/React.createElement("img", {
     src: "assets/forester-logo.png",
     alt: "Forester by Boreal Education",
     style: {
-      height: 40,
+      height: 38,
       width: "auto"
     }
   }), /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-medium",
+    className: "text-sm font-semibold tracking-tight",
     style: {
-      color: "#5B6B72",
+      color: "#52635A",
       borderLeft: "1px solid " + COL_BORDER,
       paddingLeft: 12
     }
@@ -668,7 +672,7 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "inline-flex rounded-lg p-1",
     style: {
-      background: "#E2E8EA"
+      background: "#E7F0E8"
     }
   }, TABS.map(t => {
     const active = t.key === tab;
@@ -678,7 +682,7 @@ function App() {
       className: "ab-btn text-sm font-semibold rounded-md px-4 py-1.5",
       style: {
         background: active ? "#fff" : "transparent",
-        color: active ? TEAL : "#5B6B72",
+        color: active ? TEAL : "#52635A",
         boxShadow: active ? "0 1px 3px rgba(0,0,0,.12)" : "none"
       }
     }, t.label);
@@ -689,7 +693,7 @@ function App() {
     className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-2",
     style: {
       color: "#fff",
-      background: "#6B4FB8"
+      background: "#166534"
     }
   }, /*#__PURE__*/React.createElement(IconSparkle, {
     size: 15
@@ -726,14 +730,14 @@ function App() {
     onClick: resetAll,
     className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
     style: {
-      color: "#5B6B72",
+      color: "#52635A",
       border: "1px solid " + COL_BORDER,
       background: "#fff"
     }
   }, "Reset"))), /*#__PURE__*/React.createElement("p", {
     className: "text-sm mb-3",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, SUBTITLE[tab]), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-3 flex-wrap mb-5"
@@ -744,7 +748,7 @@ function App() {
     style: {
       background: "#fff",
       border: "1px solid " + COL_BORDER,
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Balanced load", /*#__PURE__*/React.createElement("input", {
     type: "number",
@@ -763,7 +767,7 @@ function App() {
   }), "pts / seat")), /*#__PURE__*/React.createElement("div", {
     className: "inline-flex rounded-lg p-1",
     style: {
-      background: "#E2E8EA"
+      background: "#E7F0E8"
     }
   }, [["person", "By person"], ["function", "By function"]].map(([k, lbl]) => {
     const active = groupBy === k;
@@ -773,7 +777,7 @@ function App() {
       className: "ab-btn text-xs font-semibold rounded-md px-3 py-1",
       style: {
         background: active ? "#fff" : "transparent",
-        color: active ? TEAL : "#5B6B72",
+        color: active ? TEAL : "#52635A",
         boxShadow: active ? "0 1px 3px rgba(0,0,0,.12)" : "none"
       }
     }, lbl);
@@ -788,7 +792,7 @@ function App() {
   }, "Nothing planned for ", tabLabel(tab).toLowerCase(), " yet"), /*#__PURE__*/React.createElement("p", {
     className: "text-sm mb-5",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Start from your ", tabLabel(prevKey).toLowerCase(), " setup, then add open roles and shift work around — or build from scratch."), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-center gap-2"
@@ -816,7 +820,7 @@ function App() {
   }, funcNames.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-sm italic py-10",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "No responsibilities yet — add some in the by-person view or with Generate."), funcNames.map(fn => {
     const fcards = cardsForFunc(fn);
@@ -850,12 +854,12 @@ function App() {
     }, /*#__PURE__*/React.createElement("h2", {
       className: "font-bold text-lg leading-tight truncate",
       style: {
-        color: fn === "Unfiled" ? "#7A8A90" : SLATE
+        color: fn === "Unfiled" ? "#7C8B80" : SLATE
       }
     }, fn), /*#__PURE__*/React.createElement("span", {
       className: "text-xs",
       style: {
-        color: "#9AA8AD"
+        color: "#9AA89E"
       }
     }, fcards.length, " ", fcards.length === 1 ? "responsibility" : "responsibilities", " · ", pts, " pts")), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-3",
@@ -903,7 +907,8 @@ function App() {
         width: 280,
         background: bg,
         border: "1px solid " + bc,
-        borderStyle: bs
+        borderStyle: bs,
+        boxShadow: isOver ? "0 8px 24px rgba(20,83,45,.16)" : "0 1px 2px rgba(16,40,24,.05), 0 1px 3px rgba(16,40,24,.04)"
       }
     }, /*#__PURE__*/React.createElement(ColumnHeader, {
       col: col,
@@ -926,7 +931,7 @@ function App() {
     }, colCards.length === 0 && /*#__PURE__*/React.createElement("div", {
       className: "text-xs italic rounded-lg py-6 text-center",
       style: {
-        color: "#9AA8AD"
+        color: "#9AA89E"
       }
     }, isUn ? "No orphaned responsibilities" : "Drop a responsibility here"), colCards.map(card => /*#__PURE__*/React.createElement(Card, {
       key: card.id,
@@ -991,7 +996,7 @@ function LoadBar({
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-1.5 w-full rounded-full",
     style: {
-      background: "#E7ECEE"
+      background: "#E6EFE7"
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-1.5 rounded-full",
@@ -1004,12 +1009,12 @@ function LoadBar({
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "load ", load, " / ", target, " pts · ", items, " ", items === 1 ? "item" : "items"), over && /*#__PURE__*/React.createElement("span", {
     className: "text-[10px] font-bold uppercase tracking-wide rounded px-1 py-0.5",
     style: {
-      background: load > target + 2 ? "#FBE3E0" : AMBER_PILL,
+      background: load > target + 2 ? "#FEE2E2" : AMBER_PILL,
       color: load > target + 2 ? LOAD_OVER : AMBER_TX
     }
   }, "Overloaded")));
@@ -1052,13 +1057,13 @@ function ColumnHeader({
     return /*#__PURE__*/React.createElement("div", {
       className: "mb-3 rounded-lg p-2",
       style: {
-        background: "#F4F7F8",
+        background: "#F4F9F5",
         border: "1px solid " + COL_BORDER
       }
     }, /*#__PURE__*/React.createElement("label", {
       className: "block text-xs font-semibold mb-1",
       style: {
-        color: "#5B6B72"
+        color: "#52635A"
       }
     }, "Role / title"), /*#__PURE__*/React.createElement("input", {
       ref: roleRef,
@@ -1076,7 +1081,7 @@ function ColumnHeader({
     }), /*#__PURE__*/React.createElement("label", {
       className: "block text-xs font-semibold mb-1",
       style: {
-        color: "#5B6B72"
+        color: "#52635A"
       }
     }, "Name ", /*#__PURE__*/React.createElement("span", {
       className: "font-normal"
@@ -1095,7 +1100,7 @@ function ColumnHeader({
     }), /*#__PURE__*/React.createElement("label", {
       className: "block text-xs font-semibold mb-1",
       style: {
-        color: "#5B6B72"
+        color: "#52635A"
       }
     }, "Target cost ", /*#__PURE__*/React.createElement("span", {
       className: "font-normal"
@@ -1120,7 +1125,7 @@ function ColumnHeader({
       },
       className: "ab-btn p-1.5 rounded",
       style: {
-        background: "#E2E8EA",
+        background: "#E7F0E8",
         color: SLATE
       },
       title: "Cancel"
@@ -1148,7 +1153,7 @@ function ColumnHeader({
   }, isUn ? /*#__PURE__*/React.createElement("h2", {
     className: "font-bold text-lg leading-tight truncate",
     style: {
-      color: "#7A8A90"
+      color: "#7C8B80"
     }
   }, "Unassigned") : vacant ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "inline-block text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mb-1",
@@ -1176,17 +1181,17 @@ function ColumnHeader({
   }, col.name), col.role && col.role.trim() && /*#__PURE__*/React.createElement("div", {
     className: "text-xs truncate",
     style: {
-      color: "#7A8A90"
+      color: "#7C8B80"
     }
   }, col.role), col.cost > 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-xs",
     style: {
-      color: "#7A8A90"
+      color: "#7C8B80"
     }
   }, fmtMoney(col.cost), "/yr"), keyRisk && /*#__PURE__*/React.createElement("span", {
     className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mt-1",
     style: {
-      background: "#FBE3E0",
+      background: "#FEE2E2",
       color: LOAD_OVER
     },
     title: "Holds multiple critical responsibilities alone"
@@ -1208,7 +1213,7 @@ function ColumnHeader({
     className: "ab-btn p-1 rounded hover:bg-black/5",
     title: "Edit",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, /*#__PURE__*/React.createElement(IconPencil, {
     size: 14
@@ -1217,14 +1222,14 @@ function ColumnHeader({
     className: "ab-btn p-1 rounded hover:bg-black/5",
     title: "Remove (responsibilities move to Unassigned)",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, /*#__PURE__*/React.createElement(IconTrash, {
     size: 14
   })))), isUn ? /*#__PURE__*/React.createElement("span", {
     className: "text-xs",
     style: {
-      color: count > 0 ? LOAD_WARN : "#9AA8AD"
+      color: count > 0 ? LOAD_WARN : "#9AA89E"
     }
   }, count, " ", count === 1 ? "responsibility needs an owner" : "responsibilities need an owner") : /*#__PURE__*/React.createElement(LoadBar, {
     load: load,
@@ -1412,7 +1417,7 @@ function Card({
   }, /*#__PURE__*/React.createElement("div", {
     className: "px-3 py-1 text-xs font-semibold",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "Move to"), columns.map(col => {
     const here = col.id === card.personId || col.id === UNASSIGNED && !card.personId;
@@ -1444,7 +1449,7 @@ function TransitionPlan({
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-xs font-bold uppercase tracking-wide mb-2",
     style: {
-      color: tone || "#5B6B72"
+      color: tone || "#52635A"
     }
   }, title, " (", items.length, ")"), /*#__PURE__*/React.createElement("ul", {
     className: "space-y-1.5"
@@ -1456,7 +1461,7 @@ function TransitionPlan({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: tone || "#9AA8AD"
+      color: tone || "#9AA89E"
     }
   }, "•"), /*#__PURE__*/React.createElement("span", null, t))))) : null;
   const sel = (val, set) => /*#__PURE__*/React.createElement("select", {
@@ -1472,11 +1477,11 @@ function TransitionPlan({
     value: t.key
   }, t.label)));
   const c = diff.cost;
-  const deltaColor = c.delta > 0 ? LOAD_WARN : c.delta < 0 ? TEAL : "#5B6B72";
+  const deltaColor = c.delta > 0 ? LOAD_WARN : c.delta < 0 ? TEAL : "#52635A";
   return /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
     style: {
-      background: "rgba(15,36,48,.45)"
+      background: "rgba(13,33,22,.5)"
     },
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
@@ -1499,13 +1504,13 @@ function TransitionPlan({
     className: "font-bold"
   }, "Transition plan:"), sel(fromKey, setFromKey), " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "→"), " ", sel(toKey, setToKey)), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     className: "ab-btn p-1.5 rounded hover:bg-black/5",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, /*#__PURE__*/React.createElement(IconX, {
     size: 18
@@ -1514,19 +1519,19 @@ function TransitionPlan({
   }, fromKey === toKey ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Pick two different horizons to compare.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "rounded-lg p-3 mb-4 flex flex-wrap items-center gap-x-6 gap-y-1",
     style: {
-      background: "#F4F7F8",
+      background: "#F4F9F5",
       border: "1px solid " + COL_BORDER
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "text-sm"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Headcount cost "), /*#__PURE__*/React.createElement("span", {
     className: "font-semibold"
@@ -1539,7 +1544,7 @@ function TransitionPlan({
     className: "text-sm"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "New roles add "), /*#__PURE__*/React.createElement("span", {
     className: "font-semibold",
@@ -1549,7 +1554,7 @@ function TransitionPlan({
   }, fmtMoney(c.newRoles), "/yr"))), !diff.hasChanges ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "No differences between ", tabLabel(fromKey), " and ", tabLabel(toKey), " yet. Try copying one forward and adjusting it.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Section, {
     tone: TEAL,
@@ -1607,7 +1612,7 @@ function GeneratorPanel({
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: "#6B4FB8"
+      color: "#166534"
     }
   }, /*#__PURE__*/React.createElement(IconSparkle, {
     size: 18
@@ -1620,7 +1625,7 @@ function GeneratorPanel({
     onClick: onClose,
     className: "ab-btn p-1.5 rounded hover:bg-black/5",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, /*#__PURE__*/React.createElement(IconX, {
     size: 18
@@ -1632,7 +1637,7 @@ function GeneratorPanel({
   }, /*#__PURE__*/React.createElement("label", {
     className: "block text-xs font-semibold mb-1",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Business function"), /*#__PURE__*/React.createElement("select", {
     value: func,
@@ -1648,7 +1653,7 @@ function GeneratorPanel({
   }, f))), /*#__PURE__*/React.createElement("label", {
     className: "block text-xs font-semibold mb-1",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Granularity — ", /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1663,7 +1668,7 @@ function GeneratorPanel({
     onChange: e => setGrain(parseInt(e.target.value)),
     className: "w-full",
     style: {
-      accentColor: "#6B4FB8"
+      accentColor: "#166534"
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between mt-1"
@@ -1671,14 +1676,14 @@ function GeneratorPanel({
     key: g,
     className: "text-[10px]",
     style: {
-      color: grain === i + 1 ? "#6B4FB8" : "#9AA8AD",
+      color: grain === i + 1 ? "#166534" : "#9AA89E",
       fontWeight: grain === i + 1 ? 700 : 400
     }
   }, g))), /*#__PURE__*/React.createElement("button", {
     onClick: onGenerate,
     className: "ab-btn mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-md py-2.5",
     style: {
-      background: "#6B4FB8",
+      background: "#166534",
       color: "#fff"
     }
   }, /*#__PURE__*/React.createElement(IconSparkle, {
@@ -1688,14 +1693,14 @@ function GeneratorPanel({
   }, results.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm mt-4 text-center",
     style: {
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "Pick a function and granularity, then Generate. Drag a result onto a person, or tap + to drop it in Unassigned.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-2"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-semibold",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, results.length, " suggestions"), /*#__PURE__*/React.createElement("button", {
     onClick: onAddAll,
@@ -1714,7 +1719,7 @@ function GeneratorPanel({
     style: {
       background: "#fff",
       border: "1px solid " + COL_BORDER,
-      borderLeft: "3px solid #6B4FB8"
+      borderLeft: "3px solid #166534"
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-start gap-2"
@@ -1732,8 +1737,8 @@ function GeneratorPanel({
     className: "ab-btn absolute top-1.5 right-1.5 p-1 rounded",
     title: "Add to Unassigned",
     style: {
-      background: "#F1ECFA",
-      color: "#6B4FB8"
+      background: "#E9F7EE",
+      color: "#166534"
     }
   }, /*#__PURE__*/React.createElement(IconPlus, {
     size: 15
@@ -1741,7 +1746,7 @@ function GeneratorPanel({
     className: "px-4 py-2 text-[11px]",
     style: {
       borderTop: "1px solid " + COL_BORDER,
-      color: "#9AA8AD"
+      color: "#9AA89E"
     }
   }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice."));
 }
@@ -1768,7 +1773,7 @@ function JDModal({
   return /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
     style: {
-      background: "rgba(15,36,48,.45)"
+      background: "rgba(13,33,22,.5)"
     },
     onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
@@ -1799,7 +1804,7 @@ function JDModal({
     onClick: onClose,
     className: "ab-btn p-1.5 rounded hover:bg-black/5",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, /*#__PURE__*/React.createElement(IconX, {
     size: 18
@@ -1808,7 +1813,7 @@ function JDModal({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs mb-2",
     style: {
-      color: "#5B6B72"
+      color: "#52635A"
     }
   }, "Drafted from this role's responsibilities. Edit the bracketed parts, then copy it out."), /*#__PURE__*/React.createElement("textarea", {
     value: text,
@@ -1826,7 +1831,7 @@ function JDModal({
     onClick: onClose,
     className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
     style: {
-      color: "#5B6B72",
+      color: "#52635A",
       border: "1px solid " + COL_BORDER
     }
   }, "Close"), /*#__PURE__*/React.createElement("button", {
