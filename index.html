@@ -823,7 +823,7 @@ function App() {
   }, /*#__PURE__*/React.createElement(IconPlus, {
     size: 15
   }), " Add an open role"))) : groupBy === "function" ? /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-4 overflow-x-auto pb-4 items-start"
+    className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
   }, funcNames.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-sm italic py-10",
     style: {
@@ -849,10 +849,10 @@ function App() {
         setGenDrag(null);
         setOverCol(null);
       },
-      className: "flex-shrink-0 rounded-xl p-3",
+      className: isMobile ? "rounded-xl p-3" : "flex-shrink-0 rounded-xl p-3",
       style: {
-        width: 280,
-        maxWidth: "85vw",
+        width: isMobile ? "100%" : 280,
+        maxWidth: isMobile ? "100%" : "85vw",
         background: isOver ? DROP_BG : "#fff",
         border: "1px solid " + (isOver ? TEAL : COL_BORDER),
         borderStyle: isOver ? "dashed" : "solid"
@@ -888,7 +888,7 @@ function App() {
       onDelete: deleteCard
     }))));
   })) : /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-4 overflow-x-auto pb-4 items-start"
+    className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
   }, columns.map(col => {
     const isUn = col.id === UNASSIGNED;
     const vacant = !isUn && isVacant(col);
@@ -910,10 +910,10 @@ function App() {
         setGenDrag(null);
         setOverCol(null);
       },
-      className: "flex-shrink-0 rounded-xl p-3",
+      className: isMobile ? "rounded-xl p-3" : "flex-shrink-0 rounded-xl p-3",
       style: {
-        width: 280,
-        maxWidth: "85vw",
+        width: isMobile ? "100%" : 280,
+        maxWidth: isMobile ? "100%" : "85vw",
         background: bg,
         border: "1px solid " + bc,
         borderStyle: bs,
