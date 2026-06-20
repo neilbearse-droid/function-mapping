@@ -1,4 +1,6 @@
-# Boreal — Roles & Workforce Plan
+# Forester — Roles & Workforce Plan
+
+*by Boreal Education*
 
 A lightweight, browser-based board for mapping who owns what across a leadership
 team — and for planning how those responsibilities shift as the team grows.

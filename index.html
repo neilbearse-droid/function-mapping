@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Boreal — Roles & Workforce Plan</title>
+  <title>Forester — Roles & Workforce Plan · by Boreal Education</title>
+  <link rel="icon" type="image/png" href="assets/forester-logo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -647,6 +648,22 @@ function App() {
       transition: "padding .2s ease"
     }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 mb-5"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "assets/forester-logo.png",
+    alt: "Forester by Boreal Education",
+    style: {
+      height: 40,
+      width: "auto"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-medium",
+    style: {
+      color: "#5B6B72",
+      borderLeft: "1px solid " + COL_BORDER,
+      paddingLeft: 12
+    }
+  }, "Roles & Workforce Plan")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-4 flex-wrap mb-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inline-flex rounded-lg p-1",
@@ -1737,7 +1754,7 @@ function JDModal({
   const funcs = Array.from(new Set(cards.map(c => c.func && c.func.trim()).filter(Boolean)));
   const area = funcs.length ? funcs.join(", ") : "the relevant area";
   const owned = cards.map(c => c.desc).filter(Boolean);
-  const draft = "Boreal — " + role + "\n\n" + "About the role\n" + "Boreal is hiring a " + role + " to own a clear set of responsibilities with real accountability from day one. You'll work closely with the leadership team and own outcomes end to end.\n\n" + "What you'll own\n" + (owned.length ? owned.map(d => "• " + d).join("\n") : "• [Add the responsibilities this role will own]") + "\n\n" + "What we're looking for\n" + "• [X]+ years of experience in " + area + "\n" + "• A track record of owning outcomes, not just tasks\n" + "• [Add 2–3 role-specific skills or qualifications]\n\n" + "About Boreal\n" + "[One or two sentences about Boreal and the team this role joins.]\n\n" + "Details\n" + "[Location · employment type · compensation range" + (seat.cost > 0 ? " (target " + fmtMoney(seat.cost) + "/yr)" : "") + " · how to apply]";
+  const draft = "Boreal Education — " + role + "\n\n" + "About the role\n" + "Boreal Education is hiring a " + role + " to own a clear set of responsibilities with real accountability from day one. You'll work closely with the leadership team and own outcomes end to end.\n\n" + "What you'll own\n" + (owned.length ? owned.map(d => "• " + d).join("\n") : "• [Add the responsibilities this role will own]") + "\n\n" + "What we're looking for\n" + "• [X]+ years of experience in " + area + "\n" + "• A track record of owning outcomes, not just tasks\n" + "• [Add 2–3 role-specific skills or qualifications]\n\n" + "About Boreal Education\n" + "[One or two sentences about Boreal Education and the team this role joins.]\n\n" + "Details\n" + "[Location · employment type · compensation range" + (seat.cost > 0 ? " (target " + fmtMoney(seat.cost) + "/yr)" : "") + " · how to apply]";
   const [text, setText] = useState(draft);
   const [copied, setCopied] = useState(false);
   const copy = () => {
