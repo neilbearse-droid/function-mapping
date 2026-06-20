@@ -679,7 +679,7 @@ function App() {
     return /*#__PURE__*/React.createElement("button", {
       key: t.key,
       onClick: () => setTab(t.key),
-      className: "ab-btn text-sm font-semibold rounded-md px-4 py-1.5",
+      className: "ab-btn text-sm font-semibold rounded-full px-4 py-1.5",
       style: {
         background: active ? "#fff" : "transparent",
         color: active ? TEAL : "#52635A",
@@ -690,7 +690,7 @@ function App() {
     className: "flex items-center gap-2 flex-wrap"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setGenOpen(true),
-    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
     style: {
       color: "#fff",
       background: "#166534"
@@ -699,7 +699,7 @@ function App() {
     size: 15
   }), " Generate"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPlanOpen(true),
-    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-3 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
     style: {
       color: TEAL,
       border: "1px solid " + COL_BORDER,
@@ -709,7 +709,7 @@ function App() {
     size: 15
   }), " Transition plan"), prevKey && /*#__PURE__*/React.createElement("button", {
     onClick: () => copyFrom(prevKey),
-    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-3 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
     style: {
       color: TEAL,
       border: "1px solid " + COL_BORDER,
@@ -719,7 +719,7 @@ function App() {
     size: 15
   }), " Copy from ", tabLabel(prevKey)), /*#__PURE__*/React.createElement("button", {
     onClick: addPerson,
-    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-3 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
     style: {
       background: TEAL,
       color: "#fff"
@@ -728,7 +728,7 @@ function App() {
     size: 16
   }), " ", tab === "today" ? "Add teammate" : "Add role"), /*#__PURE__*/React.createElement("button", {
     onClick: resetAll,
-    className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
     style: {
       color: "#52635A",
       border: "1px solid " + COL_BORDER,
@@ -774,7 +774,7 @@ function App() {
     return /*#__PURE__*/React.createElement("button", {
       key: k,
       onClick: () => setGroupBy(k),
-      className: "ab-btn text-xs font-semibold rounded-md px-3 py-1",
+      className: "ab-btn text-xs font-semibold rounded-full px-3 py-1",
       style: {
         background: active ? "#fff" : "transparent",
         color: active ? TEAL : "#52635A",
@@ -798,7 +798,7 @@ function App() {
     className: "flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => copyFrom(prevKey),
-    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-md px-4 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-4 py-2",
     style: {
       background: TEAL,
       color: "#fff"
@@ -807,7 +807,7 @@ function App() {
     size: 15
   }), " Copy from ", tabLabel(prevKey)), /*#__PURE__*/React.createElement("button", {
     onClick: addPerson,
-    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-md px-4 py-2",
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-4 py-2",
     style: {
       color: TEAL,
       border: "1px solid " + COL_BORDER,
@@ -945,7 +945,7 @@ function App() {
       onDelete: deleteCard
     }))), /*#__PURE__*/React.createElement("button", {
       onClick: () => addCard(col.id),
-      className: "ab-btn mt-3 w-full flex items-center justify-center gap-1 text-sm font-medium rounded-lg py-2",
+      className: "ab-btn mt-3 w-full flex items-center justify-center gap-1 text-sm font-medium rounded-full py-2",
       style: {
         color: TEAL,
         border: "1px dashed " + TEAL
@@ -1123,7 +1123,7 @@ function ColumnHeader({
       onClick: () => {
         if (col._new) onDelete(col.id);else setEditing(false);
       },
-      className: "ab-btn p-1.5 rounded",
+      className: "ab-btn p-1.5 rounded-full",
       style: {
         background: "#E7F0E8",
         color: SLATE
@@ -1133,7 +1133,7 @@ function ColumnHeader({
       size: 14
     })), /*#__PURE__*/React.createElement("button", {
       onClick: save,
-      className: "ab-btn p-1.5 rounded",
+      className: "ab-btn p-1.5 rounded-full",
       style: {
         background: TEAL,
         color: "#fff"
@@ -1201,7 +1201,7 @@ function ColumnHeader({
     className: "flex gap-1 flex-shrink-0"
   }, vacant && /*#__PURE__*/React.createElement("button", {
     onClick: () => onDraftJD && onDraftJD(),
-    className: "ab-btn p-1 rounded hover:bg-black/5",
+    className: "ab-btn p-1 rounded-full hover:bg-black/5",
     title: "Draft job description",
     style: {
       color: AMBER_TX
@@ -1210,7 +1210,7 @@ function ColumnHeader({
     size: 14
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => setEditing(true),
-    className: "ab-btn p-1 rounded hover:bg-black/5",
+    className: "ab-btn p-1 rounded-full hover:bg-black/5",
     title: "Edit",
     style: {
       color: "#9AA89E"
@@ -1219,7 +1219,7 @@ function ColumnHeader({
     size: 14
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => onDelete(col.id),
-    className: "ab-btn p-1 rounded hover:bg-black/5",
+    className: "ab-btn p-1 rounded-full hover:bg-black/5",
     title: "Remove (responsibilities move to Unassigned)",
     style: {
       color: "#9AA89E"
@@ -1303,7 +1303,7 @@ function Card({
       onClick: () => {
         if (card._new && !card.func && !card.desc) onDelete(card.id);else setEditing(false);
       },
-      className: "ab-btn p-1.5 rounded",
+      className: "ab-btn p-1.5 rounded-full",
       style: {
         background: "rgba(255,255,255,.18)"
       },
@@ -1326,7 +1326,7 @@ function Card({
         });
         setEditing(false);
       },
-      className: "ab-btn p-1.5 rounded",
+      className: "ab-btn p-1.5 rounded-full",
       style: {
         background: "#fff",
         color: TEAL
@@ -1381,7 +1381,7 @@ function Card({
     className: "absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
   }, !hideMenu && /*#__PURE__*/React.createElement("button", {
     onClick: () => setMenuOpen(m => !m),
-    className: "ab-btn p-1 rounded",
+    className: "ab-btn p-1 rounded-full",
     style: {
       background: "rgba(255,255,255,.18)"
     },
@@ -1390,7 +1390,7 @@ function Card({
     size: 14
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => setEditing(true),
-    className: "ab-btn p-1 rounded",
+    className: "ab-btn p-1 rounded-full",
     style: {
       background: "rgba(255,255,255,.18)"
     },
@@ -1399,7 +1399,7 @@ function Card({
     size: 14
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => onDelete(card.id),
-    className: "ab-btn p-1 rounded",
+    className: "ab-btn p-1 rounded-full",
     style: {
       background: "rgba(255,255,255,.18)"
     },
@@ -1508,7 +1508,7 @@ function TransitionPlan({
     }
   }, "→"), " ", sel(toKey, setToKey)), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
     style: {
       color: "#52635A"
     }
@@ -1623,7 +1623,7 @@ function GeneratorPanel({
     }
   }, "Responsibilities generator")), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
     style: {
       color: "#52635A"
     }
@@ -1681,7 +1681,7 @@ function GeneratorPanel({
     }
   }, g))), /*#__PURE__*/React.createElement("button", {
     onClick: onGenerate,
-    className: "ab-btn mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-md py-2.5",
+    className: "ab-btn mt-3 w-full flex items-center justify-center gap-2 text-sm font-semibold rounded-full py-2.5",
     style: {
       background: "#166534",
       color: "#fff"
@@ -1734,7 +1734,7 @@ function GeneratorPanel({
     }
   }, item.desc)), /*#__PURE__*/React.createElement("button", {
     onClick: () => onAddOne(item),
-    className: "ab-btn absolute top-1.5 right-1.5 p-1 rounded",
+    className: "ab-btn absolute top-1.5 right-1.5 p-1 rounded-full",
     title: "Add to Unassigned",
     style: {
       background: "#E9F7EE",
@@ -1802,7 +1802,7 @@ function JDModal({
     }
   }, "Job description — ", role)), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    className: "ab-btn p-1.5 rounded hover:bg-black/5",
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
     style: {
       color: "#52635A"
     }
@@ -1829,14 +1829,14 @@ function JDModal({
     className: "flex justify-end gap-2 mt-3"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    className: "ab-btn text-sm font-medium rounded-md px-3 py-2",
+    className: "ab-btn text-sm font-medium rounded-full px-3 py-2",
     style: {
       color: "#52635A",
       border: "1px solid " + COL_BORDER
     }
   }, "Close"), /*#__PURE__*/React.createElement("button", {
     onClick: copy,
-    className: "ab-btn text-sm font-semibold rounded-md px-3 py-2",
+    className: "ab-btn text-sm font-semibold rounded-full px-3 py-2",
     style: {
       background: TEAL,
       color: "#fff"
