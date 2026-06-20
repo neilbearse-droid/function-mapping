@@ -470,6 +470,13 @@ function App() {
   const [genDrag, setGenDrag] = useState(null);
   const [groupBy, setGroupBy] = useState("person");
   const [jd, setJd] = useState(null);
+  const [vw, setVw] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = vw < 640;
   useEffect(() => {
     saveState({
       views,
@@ -643,9 +650,9 @@ function App() {
     },
     className: "w-full"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "max-w-full mx-auto px-6 py-6",
+    className: "max-w-full mx-auto px-4 py-4 sm:px-6 sm:py-6",
     style: {
-      paddingRight: genOpen ? 360 : undefined,
+      paddingRight: genOpen && !isMobile ? 360 : undefined,
       transition: "padding .2s ease"
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -845,6 +852,7 @@ function App() {
       className: "flex-shrink-0 rounded-xl p-3",
       style: {
         width: 280,
+        maxWidth: "85vw",
         background: isOver ? DROP_BG : "#fff",
         border: "1px solid " + (isOver ? TEAL : COL_BORDER),
         borderStyle: isOver ? "dashed" : "solid"
@@ -905,6 +913,7 @@ function App() {
       className: "flex-shrink-0 rounded-xl p-3",
       style: {
         width: 280,
+        maxWidth: "85vw",
         background: bg,
         border: "1px solid " + bc,
         borderStyle: bs,
@@ -972,7 +981,8 @@ function App() {
     onAddAll: () => genResults.forEach(item => addGenerated(item, UNASSIGNED)),
     onDragStartItem: item => setGenDrag(item),
     onDragEndItem: () => setGenDrag(null),
-    onClose: () => setGenOpen(false)
+    onClose: () => setGenOpen(false),
+    isMobile: isMobile
   }), jd && (() => {
     const seat = view.people.find(x => x.id === jd.seatId);
     if (!seat) return null;
@@ -1593,12 +1603,20 @@ function GeneratorPanel({
   onAddAll,
   onDragStartItem,
   onDragEndItem,
-  onClose
+  onClose,
+  isMobile
 }) {
-  return /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, isMobile && /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    className: "fixed inset-0 z-40",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
     className: "fixed top-0 right-0 bottom-0 z-40 flex flex-col",
     style: {
-      width: 348,
+      width: isMobile ? "100vw" : 348,
+      maxWidth: "100vw",
       background: "#fff",
       borderLeft: "1px solid " + COL_BORDER,
       boxShadow: "-8px 0 30px rgba(0,0,0,.10)"
@@ -1748,7 +1766,7 @@ function GeneratorPanel({
       borderTop: "1px solid " + COL_BORDER,
       color: "#9AA89E"
     }
-  }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice."));
+  }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice.")));
 }
 function JDModal({
   seat,
