@@ -87,6 +87,22 @@ const saveName = n => {
     localStorage.setItem(NAME_KEY, n || "");
   } catch (e) {}
 };
+const relTime = ts => {
+  if (!ts) return "";
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  const d = Math.floor(h / 24);
+  if (d < 7) return d + "d ago";
+  try {
+    return new Date(ts).toLocaleDateString();
+  } catch (e) {
+    return "";
+  }
+};
 const norm = s => (s || "").trim().toLowerCase();
 const isVacant = p => !p.name || !p.name.trim();
 const cardWeight = c => WEIGHT[c.weight] || 2;
@@ -275,6 +291,9 @@ const IconCopy = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/Reac
   rx: "2"
 }), /*#__PURE__*/React.createElement("path", {
   d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+}));
+const IconComment = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.4A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z"
 }));
 const IconShare = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("circle", {
   cx: "18",
@@ -514,6 +533,7 @@ function App() {
   const [groupBy, setGroupBy] = useState("person");
   const [jd, setJd] = useState(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [commentTarget, setCommentTarget] = useState(null);
   const [author, setAuthor] = useState(loadName());
   useEffect(() => {
     saveName(author);
@@ -631,6 +651,28 @@ function App() {
       personId: null
     } : c));
     setPeople(p => p.filter(x => x.id !== id));
+  };
+  const addComment = (kind, id, text) => {
+    const t = (text || "").trim();
+    if (!t) return;
+    const c = {
+      id: uid(),
+      author: (author || "").trim() || "Someone",
+      text: t,
+      ts: Date.now()
+    };
+    const apply = arr => arr.map(o => o.id === id ? {
+      ...o,
+      comments: [...(o.comments || []), c]
+    } : o);
+    if (kind === "seat") setPeople(apply);else setCards(apply);
+  };
+  const deleteComment = (kind, id, commentId) => {
+    const apply = arr => arr.map(o => o.id === id ? {
+      ...o,
+      comments: (o.comments || []).filter(c => c.id !== commentId)
+    } : o);
+    if (kind === "seat") setPeople(apply);else setCards(apply);
   };
   const copyFrom = fromKey => {
     const nonEmpty = view.people.length || view.cards.length;
@@ -959,7 +1001,11 @@ function App() {
       onDragEnd: () => setDragId(null),
       onMove: moveCard,
       onUpdate: updateCard,
-      onDelete: deleteCard
+      onDelete: deleteCard,
+      onComments: () => setCommentTarget({
+        kind: "card",
+        id: card.id
+      })
     }))));
   })) : /*#__PURE__*/React.createElement("div", {
     className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
@@ -1005,6 +1051,10 @@ function App() {
       onDelete: deletePerson,
       onDraftJD: () => setJd({
         seatId: col.id
+      }),
+      onComments: () => setCommentTarget({
+        kind: "seat",
+        id: col.id
       })
     }), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-3",
@@ -1025,7 +1075,11 @@ function App() {
       onDragEnd: () => setDragId(null),
       onMove: moveCard,
       onUpdate: updateCard,
-      onDelete: deleteCard
+      onDelete: deleteCard,
+      onComments: () => setCommentTarget({
+        kind: "card",
+        id: card.id
+      })
     }))), /*#__PURE__*/React.createElement("button", {
       onClick: () => addCard(col.id),
       className: "ab-btn mt-3 w-full flex items-center justify-center gap-1 text-sm font-medium rounded-full py-2",
@@ -1078,7 +1132,158 @@ function App() {
       setShareOpen(false);
     },
     onClose: () => setShareOpen(false)
-  }));
+  }), commentTarget && (() => {
+    const isSeat = commentTarget.kind === "seat";
+    const obj = isSeat ? view.people.find(p => p.id === commentTarget.id) : view.cards.find(c => c.id === commentTarget.id);
+    if (!obj) return null;
+    const title = isSeat ? colLabel(obj) : obj.desc && obj.desc.trim() || "Responsibility";
+    return /*#__PURE__*/React.createElement(CommentsModal, {
+      title: title,
+      subtitle: isSeat ? "Person / seat" : "Responsibility" + (obj.func ? " · " + obj.func : ""),
+      comments: obj.comments || [],
+      author: author,
+      onAdd: text => addComment(commentTarget.kind, commentTarget.id, text),
+      onDelete: cid => deleteComment(commentTarget.kind, commentTarget.id, cid),
+      onClose: () => setCommentTarget(null)
+    });
+  })());
+}
+function CommentsModal({
+  title,
+  subtitle,
+  comments,
+  author,
+  onAdd,
+  onDelete,
+  onClose
+}) {
+  const [text, setText] = useState("");
+  const submit = () => {
+    const t = text.trim();
+    if (!t) return;
+    onAdd(t);
+    setText("");
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    className: "rounded-xl bg-white w-full max-w-md my-8 flex flex-col",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+      maxHeight: "80vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start justify-between gap-2 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: TEAL
+    }
+  }, /*#__PURE__*/React.createElement(IconComment, {
+    size: 16
+  })), /*#__PURE__*/React.createElement("h2", {
+    className: "text-base font-semibold truncate",
+    style: {
+      color: SLATE
+    }
+  }, title)), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs mt-0.5",
+    style: {
+      color: "#9AA89E"
+    }
+  }, subtitle)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5 flex-shrink-0",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-3 overflow-y-auto flex flex-col gap-3",
+    style: {
+      flex: 1
+    }
+  }, comments.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm italic py-6 text-center",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "No comments yet. Start the conversation.") : comments.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.id,
+    className: "group rounded-lg p-2.5",
+    style: {
+      background: "#F4F9F5",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-semibold",
+    style: {
+      color: TEAL
+    }
+  }, c.author || "Someone"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px]",
+    style: {
+      color: "#9AA89E"
+    }
+  }, relTime(c.ts)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onDelete(c.id),
+    className: "ab-btn p-0.5 rounded-full hover:bg-black/5 opacity-0 group-hover:opacity-100 focus:opacity-100",
+    title: "Delete comment",
+    style: {
+      color: "#9AA89E"
+    }
+  }, /*#__PURE__*/React.createElement(IconTrash, {
+    size: 13
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm whitespace-pre-wrap",
+    style: {
+      color: SLATE
+    }
+  }, c.text)))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-3 flex items-end gap-2",
+    style: {
+      borderTop: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("textarea", {
+    value: text,
+    onChange: e => setText(e.target.value),
+    onKeyDown: e => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+    },
+    rows: 2,
+    placeholder: (author ? "Comment as " + author : "Add a comment") + "…  (⌘/Ctrl+Enter)",
+    className: "flex-1 rounded-lg px-2.5 py-2 text-sm",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE,
+      resize: "none"
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !text.trim(),
+    className: "ab-btn text-sm font-semibold rounded-full px-4 py-2 disabled:opacity-40",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, "Post"))));
 }
 function ShareModal({
   views,
@@ -1360,7 +1565,8 @@ function ColumnHeader({
   keyRisk,
   onUpdate,
   onDelete,
-  onDraftJD
+  onDraftJD,
+  onComments
 }) {
   const [editing, setEditing] = useState(col._new || false);
   const roleRef = useRef(null);
@@ -1530,7 +1736,18 @@ function ColumnHeader({
     size: 11
   }), " Key-person risk"))), !isUn && /*#__PURE__*/React.createElement("div", {
     className: "flex gap-1 flex-shrink-0"
-  }, vacant && /*#__PURE__*/React.createElement("button", {
+  }, onComments && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onComments(),
+    className: "ab-btn flex items-center gap-0.5 p-1 rounded-full hover:bg-black/5",
+    title: "Comments",
+    style: {
+      color: col.comments && col.comments.length ? TEAL : "#9AA89E"
+    }
+  }, /*#__PURE__*/React.createElement(IconComment, {
+    size: 14
+  }), col.comments && col.comments.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold"
+  }, col.comments.length)), vacant && /*#__PURE__*/React.createElement("button", {
     onClick: () => onDraftJD && onDraftJD(),
     className: "ab-btn p-1 rounded-full hover:bg-black/5",
     title: "Draft job description",
@@ -1578,7 +1795,8 @@ function Card({
   onDragEnd,
   onMove,
   onUpdate,
-  onDelete
+  onDelete,
+  onComments
 }) {
   const [editing, setEditing] = useState(card._new || false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1708,9 +1926,28 @@ function Card({
     style: {
       background: "rgba(255,255,255,.18)"
     }
-  }, ownerLabel))), /*#__PURE__*/React.createElement("div", {
+  }, ownerLabel), card.comments && card.comments.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onComments && onComments(),
+    className: "mt-2 ml-1 inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-1.5 py-0.5 align-top",
+    style: {
+      background: "rgba(255,255,255,.22)",
+      color: "#fff"
+    },
+    title: "View comments"
+  }, /*#__PURE__*/React.createElement(IconComment, {
+    size: 11
+  }), card.comments.length))), /*#__PURE__*/React.createElement("div", {
     className: "absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-  }, !hideMenu && /*#__PURE__*/React.createElement("button", {
+  }, onComments && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onComments(),
+    className: "ab-btn p-1 rounded-full",
+    style: {
+      background: "rgba(255,255,255,.18)"
+    },
+    title: "Comments"
+  }, /*#__PURE__*/React.createElement(IconComment, {
+    size: 14
+  })), !hideMenu && /*#__PURE__*/React.createElement("button", {
     onClick: () => setMenuOpen(m => !m),
     className: "ab-btn p-1 rounded-full",
     style: {
