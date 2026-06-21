@@ -38,6 +38,10 @@ and propose changes for review.
   **key-person risk** on whoever picks them up. Anything you leave goes to
   Unassigned, and a removal can be **undone** from the toast that appears. Empty
   seats are removed with no prompt.
+- **Reporting lines** — give any seat a **"Reports to"** manager (in the seat
+  editor). Each seat then shows *reports to X* and a *direct reports* count, and
+  removing a manager **promotes their reports up** to the next level. Per-horizon,
+  so structure can change over time, and it travels with copy-forward and shares.
 - **Unassigned column** — surfaces responsibilities nobody currently owns.
 
 ### Insight layer
@@ -60,8 +64,10 @@ and propose changes for review.
 
 ### Views & generators
 
-- **By person / By function** — toggle the board between grouping by owner and
-  grouping by business area. In the function view each card shows who owns it.
+- **By person / By function / Org chart** — toggle the board between grouping by
+  owner, grouping by business area, and an **org chart** (an indented tree built
+  from the *Reports to* links, showing each person's direct reports, responsibility
+  count, and load — with overload and key-person flags).
 - **Responsibilities generator** — pick a function and a granularity (Broad →
   Granular) and generate a list of responsibilities to drag onto a person or drop
   into Unassigned. Suggestions come from a built-in library (a starting point to
@@ -116,6 +122,8 @@ all of it travels inside a shared plan.
 | Set effort | Edit a responsibility and pick S / M / L |
 | Generate responsibilities | **Generate** → choose function + granularity |
 | Group by business area | **By function** toggle (top right) |
+| Set who someone reports to | Edit a seat → **Reports to** |
+| See the org chart | **Org chart** toggle (top right) |
 | Draft a job description | Open role → document icon in its header |
 | Generate a job description with AI | **Transition plan** → *Generate JD* on a new hire (needs your Anthropic API key) |
 | Start a future plan from your team | **Copy from Today / 6 months** |

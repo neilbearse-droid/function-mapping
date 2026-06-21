@@ -687,6 +687,31 @@ function App() {
   const cardsFor = colId => view.cards.filter(c => colId === UNASSIGNED ? !c.personId || c.personId === UNASSIGNED : c.personId === colId);
   const seatLoad = pid => cardsFor(pid).reduce((a, c) => a + cardWeight(c), 0);
   const keyRiskOf = pid => cardsFor(pid).filter(c => c.weight === "L").length >= 2;
+  const reportsOf = pid => view.people.filter(p => p.managerId === pid);
+  const descendantsOf = pid => {
+    const out = new Set();
+    const walk = x => view.people.forEach(p => {
+      if (p.managerId === x && !out.has(p.id)) {
+        out.add(p.id);
+        walk(p.id);
+      }
+    });
+    walk(pid);
+    return out;
+  };
+  const managerOptionsFor = id => {
+    const banned = descendantsOf(id);
+    return view.people.filter(p => p.id !== id && !banned.has(p.id)).map(p => ({
+      id: p.id,
+      label: colLabel(p)
+    }));
+  };
+  const managerLabelOf = pid => {
+    const seat = view.people.find(p => p.id === pid);
+    if (!seat || !seat.managerId) return "";
+    const mgr = view.people.find(p => p.id === seat.managerId);
+    return mgr ? colLabel(mgr) : "";
+  };
   const funcNames = Array.from(new Set(view.cards.map(c => c.func && c.func.trim() || "Unfiled"))).sort();
   const cardsForFunc = fn => view.cards.filter(c => (c.func && c.func.trim() || "Unfiled") === fn);
   const personLabel = pid => {
@@ -732,6 +757,8 @@ function App() {
       weight: s.card.weight
     }]);else if (s.kind === "removeSeat") {
       const alloc = s.allocation || {};
+      const rmSeat = view.people.find(p => p.id === s.seatId);
+      const newMgr = rmSeat ? rmSeat.managerId || null : null;
       setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(alloc, c.id) ? {
         ...c,
         personId: alloc[c.id]
@@ -739,7 +766,10 @@ function App() {
         ...c,
         personId: null
       } : c));
-      setPeople(p => p.filter(x => x.id !== s.seatId));
+      setPeople(p => p.filter(x => x.id !== s.seatId).map(x => x.managerId === s.seatId ? {
+        ...x,
+        managerId: newMgr
+      } : x));
     }
     removeSuggestion(id);
   };
@@ -858,15 +888,9 @@ function App() {
     ...x,
     ...patch
   } : x));
-  const deletePerson = id => {
-    setCards(cs => cs.map(c => c.personId === id ? {
-      ...c,
-      personId: null
-    } : c));
-    setPeople(p => p.filter(x => x.id !== id));
-  };
   const removeSeatNow = (id, allocation) => {
     const seat = view.people.find(p => p.id === id);
+    const newMgr = seat ? seat.managerId || null : null;
     const snap = view;
     setCards(cs => cs.map(c => Object.prototype.hasOwnProperty.call(allocation, c.id) ? {
       ...c,
@@ -875,7 +899,10 @@ function App() {
       ...c,
       personId: null
     } : c));
-    setPeople(p => p.filter(x => x.id !== id));
+    setPeople(p => p.filter(x => x.id !== id).map(x => x.managerId === id ? {
+      ...x,
+      managerId: newMgr
+    } : x));
     setUndo({
       label: "Removed " + (seat ? colLabel(seat) : "seat"),
       tab: tab,
@@ -952,6 +979,9 @@ function App() {
         ...rest,
         id: nid
       };
+    });
+    people.forEach(p => {
+      p.managerId = p.managerId ? idMap[p.managerId] || null : null;
     });
     const cards = srcV.cards.map(c => {
       const {
@@ -1209,7 +1239,7 @@ function App() {
     style: {
       background: "#E7F0E8"
     }
-  }, [["person", "By person"], ["function", "By function"]].map(([k, lbl]) => {
+  }, [["person", "By person"], ["function", "By function"], ["org", "Org chart"]].map(([k, lbl]) => {
     const active = groupBy === k;
     return /*#__PURE__*/React.createElement("button", {
       key: k,
@@ -1255,7 +1285,11 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(IconPlus, {
     size: 15
-  }), " Add an open role"))) : groupBy === "function" ? /*#__PURE__*/React.createElement("div", {
+  }), " Add an open role"))) : groupBy === "org" ? /*#__PURE__*/React.createElement(OrgChart, {
+    people: view.people,
+    cards: view.cards,
+    target: target
+  }) : groupBy === "function" ? /*#__PURE__*/React.createElement("div", {
     className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
   }, funcNames.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-sm italic py-10",
@@ -1380,7 +1414,10 @@ function App() {
       }),
       seatSugg: seatSugg || null,
       onAcceptSuggestion: acceptSuggestion,
-      onRejectSuggestion: removeSuggestion
+      onRejectSuggestion: removeSuggestion,
+      managerOptions: isUn ? [] : managerOptionsFor(col.id),
+      managerLabel: isUn ? "" : managerLabelOf(col.id),
+      reportCount: isUn ? 0 : reportsOf(col.id).length
     }), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-3",
       style: {
@@ -2163,16 +2200,21 @@ function ColumnHeader({
   onComments,
   seatSugg,
   onAcceptSuggestion,
-  onRejectSuggestion
+  onRejectSuggestion,
+  managerOptions,
+  managerLabel,
+  reportCount
 }) {
   const [editing, setEditing] = useState(col._new || false);
   const roleRef = useRef(null);
   const nameRef = useRef(null);
   const costRef = useRef(null);
+  const mgrRef = useRef(null);
   const save = () => {
     const role = roleRef.current.value.trim();
     const name = nameRef.current.value.trim();
     const cost = parseInt((costRef.current.value || "").replace(/[^0-9]/g, "")) || 0;
+    const managerId = mgrRef.current && mgrRef.current.value || null;
     if (!role && !name) {
       if (col._new) {
         onDelete(col.id);
@@ -2183,6 +2225,7 @@ function ColumnHeader({
       role,
       name,
       cost,
+      managerId,
       _new: false
     });
     setEditing(false);
@@ -2246,12 +2289,30 @@ function ColumnHeader({
       onKeyDown: e => {
         if (e.key === "Enter") save();
       },
+      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
+      style: {
+        border: "1px solid " + COL_BORDER,
+        color: SLATE
+      }
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "block text-xs font-semibold mb-1",
+      style: {
+        color: "#52635A"
+      }
+    }, "Reports to"), /*#__PURE__*/React.createElement("select", {
+      ref: mgrRef,
+      defaultValue: col.managerId || "",
       className: "w-full rounded px-2 py-1 text-sm bg-white",
       style: {
         border: "1px solid " + COL_BORDER,
         color: SLATE
       }
-    }), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "— No one (top of org) —"), (managerOptions || []).map(o => /*#__PURE__*/React.createElement("option", {
+      key: o.id,
+      value: o.id
+    }, o.label))), /*#__PURE__*/React.createElement("div", {
       className: "flex justify-end gap-2 mt-2"
     }, /*#__PURE__*/React.createElement("button", {
       onClick: () => {
@@ -2331,7 +2392,16 @@ function ColumnHeader({
     title: "Holds multiple critical responsibilities alone"
   }, /*#__PURE__*/React.createElement(IconWarn, {
     size: 11
-  }), " Key-person risk"))), !isUn && /*#__PURE__*/React.createElement("div", {
+  }), " Key-person risk")), !isUn && (managerLabel || reportCount > 0) && /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] mt-1 flex flex-wrap gap-x-2",
+    style: {
+      color: "#7C8B80"
+    }
+  }, managerLabel && /*#__PURE__*/React.createElement("span", null, "↳ reports to ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600
+    }
+  }, managerLabel)), reportCount > 0 && /*#__PURE__*/React.createElement("span", null, reportCount, reportCount === 1 ? " report" : " reports"))), !isUn && /*#__PURE__*/React.createElement("div", {
     className: "flex gap-1 flex-shrink-0"
   }, onComments && /*#__PURE__*/React.createElement("button", {
     onClick: () => onComments(),
@@ -3121,6 +3191,107 @@ function GeneratorPanel({
       color: "#9AA89E"
     }
   }, "Suggestions come from a built-in library — a starting point to edit, not legal or HR advice.")));
+}
+function OrgChart({
+  people,
+  cards,
+  target
+}) {
+  if (!people || people.length === 0) return /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl text-center px-6 py-14",
+    style: {
+      border: "2px dashed " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm",
+    style: {
+      color: "#52635A"
+    }
+  }, "Add teammates or open roles first, then set who reports to whom (edit a seat → ", /*#__PURE__*/React.createElement("em", null, "Reports to"), ") to build the chart."));
+  const ids = new Set(people.map(p => p.id));
+  const childrenOf = id => people.filter(p => (p.managerId || null) === id);
+  const roots = people.filter(p => !p.managerId || !ids.has(p.managerId));
+  const load = pid => cards.filter(c => c.personId === pid).reduce((a, c) => a + cardWeight(c), 0);
+  const respCount = pid => cards.filter(c => c.personId === pid).length;
+  const heavy = pid => cards.filter(c => c.personId === pid && c.weight === "L").length;
+  const seen = new Set();
+  const flag = (label, color) => /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1 font-bold uppercase",
+    style: {
+      color: color
+    }
+  }, /*#__PURE__*/React.createElement(IconWarn, {
+    size: 10
+  }), label);
+  const renderNode = p => {
+    if (seen.has(p.id)) return null;
+    seen.add(p.id);
+    const kids = childrenOf(p.id);
+    const vac = isVacant(p);
+    const ld = load(p.id);
+    const over = ld > target;
+    const kp = !vac && heavy(p.id) >= 2;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      className: "flex flex-col gap-2"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "self-start rounded-lg px-3 py-2",
+      style: {
+        background: vac ? VACANT_BG : "#fff",
+        border: "1px solid " + (vac ? AMBER_BORDER : COL_BORDER),
+        borderStyle: vac ? "dashed" : "solid",
+        maxWidth: 560
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 flex-wrap"
+    }, vac && /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5",
+      style: {
+        background: AMBER_PILL,
+        color: AMBER_TX
+      }
+    }, "Open role"), /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-sm",
+      style: {
+        color: vac ? AMBER_TX : SLATE
+      }
+    }, colLabel(p)), !vac && p.role && p.role.trim() && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs",
+      style: {
+        color: "#7C8B80"
+      }
+    }, p.role)), /*#__PURE__*/React.createElement("div", {
+      className: "text-[11px] mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 items-center",
+      style: {
+        color: "#52635A"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600
+      }
+    }, kids.length, kids.length === 1 ? " direct report" : " direct reports"), /*#__PURE__*/React.createElement("span", null, "· ", respCount(p.id), respCount(p.id) === 1 ? " responsibility" : " responsibilities"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: over ? LOAD_OVER : "#52635A"
+      }
+    }, "· load ", ld, "/", target), over && flag("over", LOAD_OVER), kp && flag("key-person", LOAD_OVER))), kids.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "pl-4 ml-3 flex flex-col gap-2",
+      style: {
+        borderLeft: "2px solid " + COL_BORDER
+      }
+    }, kids.map(renderNode)));
+  };
+  const hasEdges = people.some(p => p.managerId && ids.has(p.managerId));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "pb-4 flex flex-col gap-3"
+  }, !hasEdges && /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg px-3 py-2 text-sm",
+    style: {
+      background: AMBER_PILL,
+      color: AMBER_TX,
+      border: "1px solid " + AMBER_BORDER
+    }
+  }, "Everyone's at the top level. Edit a seat (in ", /*#__PURE__*/React.createElement("strong", null, "By person"), ") and set ", /*#__PURE__*/React.createElement("strong", null, "Reports to"), " to build your hierarchy."), roots.map(renderNode));
 }
 function OffboardModal({
   seat,
