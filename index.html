@@ -401,6 +401,17 @@ const IconSparkle = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/R
 }), /*#__PURE__*/React.createElement("path", {
   d: "M19 14l.7 1.9L21.5 16l-1.8.7L19 18.5l-.7-1.8L16.5 16l1.8-.6L19 14z"
 }));
+const IconScale = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M12 3v18"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M5 7h14"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M5 7l-3 6a3 3 0 0 0 6 0z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M19 7l-3 6a3 3 0 0 0 6 0z"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 21h8"
+}));
 const IconDoc = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
   d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
 }), /*#__PURE__*/React.createElement("path", {
@@ -590,6 +601,31 @@ function diffViews(src, dst) {
     hasChanges
   };
 }
+function scenarioStats(v, target) {
+  const people = (v && v.people) || [];
+  const cards = (v && v.cards) || [];
+  const loadOf = pid => cards.filter(c => c.personId === pid).reduce((a, c) => a + cardWeight(c), 0);
+  const heavyOf = pid => cards.filter(c => c.personId === pid && c.weight === "L").length;
+  const filled = people.filter(p => !isVacant(p));
+  const open = people.filter(p => isVacant(p));
+  const overloaded = people.filter(p => loadOf(p.id) > target).map(p => ({
+    label: colLabel(p),
+    load: loadOf(p.id),
+    vacant: isVacant(p)
+  })).sort((a, b) => b.load - a.load);
+  const keyRisks = filled.filter(p => heavyOf(p.id) >= 2).map(p => colLabel(p));
+  const unassigned = cards.filter(c => !c.personId || c.personId === UNASSIGNED).map(c => c.desc && c.desc.trim() || c.func && c.func.trim() || "Untitled responsibility");
+  const cost = people.reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  return {
+    filled: filled.length,
+    open: open.length,
+    cost,
+    overloaded,
+    keyRisks,
+    unassigned,
+    respCount: cards.length
+  };
+}
 function App() {
   const init = loadState() || SEED;
   const [views, setViews] = useState(init.views);
@@ -600,6 +636,7 @@ function App() {
   const [dragId, setDragId] = useState(null);
   const [overCol, setOverCol] = useState(null);
   const [planOpen, setPlanOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [genFunc, setGenFunc] = useState("Marketing");
   const [genGrain, setGenGrain] = useState(2);
@@ -1132,7 +1169,17 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(IconRoute, {
     size: 15
-  }), " Transition plan"), prevKey && /*#__PURE__*/React.createElement("button", {
+  }), " Transition plan"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCompareOpen(true),
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconScale, {
+    size: 15
+  }), " Compare"), prevKey && /*#__PURE__*/React.createElement("button", {
     onClick: () => copyFrom(prevKey),
     className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
     style: {
@@ -1475,6 +1522,13 @@ function App() {
     views: views,
     initialFrom: tab,
     onClose: () => setPlanOpen(false)
+  }), compareOpen && /*#__PURE__*/React.createElement(CompareModal, {
+    views: views,
+    target: target,
+    initialA: tab,
+    initialB: NEXT[tab] || PREV[tab] || "m6",
+    onGoto: setTab,
+    onClose: () => setCompareOpen(false)
   }), genOpen && /*#__PURE__*/React.createElement(GeneratorPanel, {
     func: genFunc,
     setFunc: setGenFunc,
@@ -2814,6 +2868,251 @@ function GhostCard({
       border: "1px solid " + AMBER_TX
     }
   }, "Reject"))));
+}
+function CompareModal({
+  views,
+  target,
+  initialA,
+  initialB,
+  onClose,
+  onGoto
+}) {
+  const [aKey, setAKey] = useState(initialA || "today");
+  const [bKey, setBKey] = useState(initialB || NEXT[initialA] || "m6");
+  const same = aKey === bKey;
+  const sa = scenarioStats(views[aKey], target);
+  const sb = scenarioStats(views[bKey], target);
+  const sel = (val, set) => /*#__PURE__*/React.createElement("select", {
+    value: val,
+    onChange: e => set(e.target.value),
+    className: "rounded-md px-2 py-1 text-sm bg-white font-semibold",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, TABS.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.key,
+    value: t.key
+  }, t.label)));
+  const metrics = [{
+    label: "People (filled)",
+    a: sa.filled,
+    b: sb.filled,
+    fmt: n => n,
+    dir: 0
+  }, {
+    label: "Open roles",
+    a: sa.open,
+    b: sb.open,
+    fmt: n => n,
+    dir: 0
+  }, {
+    label: "Total annual cost",
+    a: sa.cost,
+    b: sb.cost,
+    fmt: fmtMoney,
+    dir: -1
+  }, {
+    label: "Overloaded seats",
+    a: sa.overloaded.length,
+    b: sb.overloaded.length,
+    fmt: n => n,
+    dir: -1
+  }, {
+    label: "Key-person risks",
+    a: sa.keyRisks.length,
+    b: sb.keyRisks.length,
+    fmt: n => n,
+    dir: -1
+  }, {
+    label: "Unassigned responsibilities",
+    a: sa.unassigned.length,
+    b: sb.unassigned.length,
+    fmt: n => n,
+    dir: -1
+  }];
+  const deltaCell = m => {
+    const d = m.b - m.a;
+    if (d === 0) return /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#9AA89E"
+      }
+    }, "—");
+    const good = m.dir === 0 ? null : m.dir < 0 ? d < 0 : d > 0;
+    const color = good === null ? SLATE : good ? TEAL : LOAD_OVER;
+    const sign = d > 0 ? "+" : "−";
+    const mag = m.fmt(Math.abs(d));
+    return /*#__PURE__*/React.createElement("span", {
+      className: "font-bold",
+      style: {
+        color
+      }
+    }, sign, mag);
+  };
+  const detailList = (title, items, tone, empty) => /*#__PURE__*/React.createElement("div", {
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] font-bold uppercase tracking-wide mb-1",
+    style: {
+      color: "#52635A"
+    }
+  }, title, " (", items.length, ")"), items.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "text-xs italic",
+    style: {
+      color: "#9AA89E"
+    }
+  }, empty) : /*#__PURE__*/React.createElement("ul", {
+    className: "space-y-0.5"
+  }, items.slice(0, 6).map((t, i) => /*#__PURE__*/React.createElement("li", {
+    key: i,
+    className: "text-xs flex gap-1.5",
+    style: {
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: tone
+    }
+  }, "•"), /*#__PURE__*/React.createElement("span", null, t))), items.length > 6 && /*#__PURE__*/React.createElement("li", {
+    className: "text-xs",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "+", items.length - 6, " more")));
+  const sideColumn = (key, s) => /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg p-3 flex-1 min-w-0",
+    style: {
+      background: "#F7FAF7",
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-2 mb-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-bold text-sm",
+    style: {
+      color: SLATE
+    }
+  }, tabLabel(key)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      onGoto(key);
+      onClose();
+    },
+    className: "ab-btn text-[11px] font-semibold rounded-full px-2 py-0.5",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, "Open")), /*#__PURE__*/React.createElement("div", {
+    className: "text-xs mb-2",
+    style: {
+      color: "#52635A"
+    }
+  }, s.filled, s.filled === 1 ? " person" : " people", s.open > 0 ? " · " + s.open + " open" : "", " · ", fmtMoney(s.cost), "/yr"), detailList("Overloaded", s.overloaded.map(o => o.label + " (" + o.load + "/" + target + ")"), LOAD_OVER, "Nobody over the cap."), detailList("Unassigned responsibilities", s.unassigned, AMBER_TX, "Everything is owned."));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-3xl my-8",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap text-sm",
+    style: {
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: TEAL
+    }
+  }, /*#__PURE__*/React.createElement(IconScale, {
+    size: 17
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold"
+  }, "Compare:"), sel(aKey, setAKey), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#9AA89E"
+    }
+  }, "vs"), sel(bKey, setBKey)), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4"
+  }, same ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm",
+    style: {
+      color: "#52635A"
+    }
+  }, "Pick two different scenarios to compare.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg overflow-hidden mb-4",
+    style: {
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grid text-xs font-bold uppercase tracking-wide",
+    style: {
+      gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
+      background: "#F4F9F5",
+      color: "#52635A",
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2"
+  }, "Metric"), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, tabLabel(aKey)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, tabLabel(bKey)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, "Change")), metrics.map((m, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "grid text-sm items-center",
+    style: {
+      gridTemplateColumns: "1.6fr 1fr 1fr 1fr",
+      borderTop: i === 0 ? "none" : "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2",
+    style: {
+      color: "#52635A"
+    }
+  }, m.label), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right font-semibold"
+  }, m.fmt(m.a)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right font-semibold"
+  }, m.fmt(m.b)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, deltaCell(m))))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row gap-3"
+  }, sideColumn(aKey, sa), sideColumn(bKey, sb)))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end gap-2 px-5 py-3",
+    style: {
+      borderTop: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn text-sm font-semibold rounded-full px-4 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, "Done"))));
 }
 function TransitionPlan({
   views,
