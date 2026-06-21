@@ -2931,6 +2931,78 @@ function CompareModal({
     fmt: n => n,
     dir: -1
   }];
+  const joinList = arr => arr.length <= 1 ? arr.join("") : arr.length === 2 ? arr[0] + " and " + arr[1] : arr.slice(0, -1).join(", ") + ", and " + arr[arr.length - 1];
+  const recommend = () => {
+    const dCost = sb.cost - sa.cost;
+    const dOver = sb.overloaded.length - sa.overloaded.length;
+    const dRisk = sb.keyRisks.length - sa.keyRisks.length;
+    const dUn = sb.unassigned.length - sa.unassigned.length;
+    const B = tabLabel(bKey),
+      A = tabLabel(aKey);
+    const gains = [],
+      losses = [];
+    if (dOver < 0) gains.push("clears " + -dOver + " overloaded " + (-dOver === 1 ? "seat" : "seats"));
+    if (dRisk < 0) gains.push("removes " + -dRisk + " key-person " + (-dRisk === 1 ? "risk" : "risks"));
+    if (dUn < 0) gains.push("assigns " + -dUn + " previously-unassigned " + (-dUn === 1 ? "responsibility" : "responsibilities"));
+    if (dOver > 0) losses.push("adds " + dOver + " overloaded " + (dOver === 1 ? "seat" : "seats"));
+    if (dRisk > 0) losses.push("adds " + dRisk + " key-person " + (dRisk === 1 ? "risk" : "risks"));
+    if (dUn > 0) losses.push("leaves " + dUn + " more " + (dUn === 1 ? "responsibility" : "responsibilities") + " unassigned");
+    const more = fmtMoney(Math.abs(dCost));
+    if (!gains.length && !losses.length && dCost === 0) return {
+      tone: "neutral",
+      text: B + " matches " + A + " on cost, load, and risk."
+    };
+    if (!gains.length && !losses.length) return dCost < 0 ? {
+      tone: "good",
+      text: B + " costs " + more + "/yr less than " + A + ", with the same load and risk."
+    } : {
+      tone: "bad",
+      text: B + " costs " + more + "/yr more than " + A + " with no load or risk improvement — hard to justify."
+    };
+    if (gains.length && !losses.length && dCost <= 0) return {
+      tone: "good",
+      text: B + " is the stronger plan — it " + joinList(gains) + (dCost < 0 ? ", and saves " + more + "/yr" : ", at the same cost") + "."
+    };
+    if (losses.length && !gains.length && dCost >= 0) return {
+      tone: "bad",
+      text: B + " is hard to justify — it " + joinList(losses) + (dCost > 0 ? " and costs " + more + "/yr more" : " at the same cost") + "."
+    };
+    if (gains.length && !losses.length && dCost > 0) return {
+      tone: "trade",
+      text: B + " spends " + more + "/yr more, but " + joinList(gains) + "."
+    };
+    if (losses.length && !gains.length && dCost < 0) return {
+      tone: "trade",
+      text: B + " saves " + more + "/yr, but " + joinList(losses) + "."
+    };
+    const costClause = dCost > 0 ? " (and costs " + more + "/yr more)" : dCost < 0 ? " (while saving " + more + "/yr)" : "";
+    return {
+      tone: "trade",
+      text: B + " " + joinList(gains) + ", but " + joinList(losses) + costClause + "."
+    };
+  };
+  const REC_STYLE = {
+    good: {
+      bg: "#ECFDF3",
+      border: "#A7E0BC",
+      tx: TEAL
+    },
+    bad: {
+      bg: "#FEF2F2",
+      border: "#F4C2C2",
+      tx: LOAD_OVER
+    },
+    trade: {
+      bg: AMBER_PILL,
+      border: AMBER_BORDER,
+      tx: AMBER_TX
+    },
+    neutral: {
+      bg: "#F4F9F5",
+      border: COL_BORDER,
+      tx: "#52635A"
+    }
+  };
   const deltaCell = m => {
     const d = m.b - m.a;
     if (d === 0) return /*#__PURE__*/React.createElement("span", {
@@ -3058,7 +3130,30 @@ function CompareModal({
     style: {
       color: "#52635A"
     }
-  }, "Pick two different scenarios to compare.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, "Pick two different scenarios to compare.") : /*#__PURE__*/React.createElement("div", null, (() => {
+    const r = recommend();
+    const st = REC_STYLE[r.tone];
+    const Ico = r.tone === "good" ? IconCheck : r.tone === "neutral" ? IconScale : IconWarn;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "rounded-lg px-3 py-2.5 mb-4 flex items-start gap-2",
+      style: {
+        background: st.bg,
+        border: "1px solid " + st.border
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "flex-shrink-0 mt-0.5",
+      style: {
+        color: st.tx
+      }
+    }, /*#__PURE__*/React.createElement(Ico, {
+      size: 16
+    })), /*#__PURE__*/React.createElement("span", {
+      className: "text-sm font-semibold",
+      style: {
+        color: st.tx
+      }
+    }, r.text));
+  })(), /*#__PURE__*/React.createElement("div", {
     className: "rounded-lg overflow-hidden mb-4",
     style: {
       border: "1px solid " + COL_BORDER
