@@ -67,6 +67,15 @@ const AMBER_BORDER = "#F6D27A";
 const VACANT_BG = "#FFFBEB";
 const LOAD_WARN = "#D97706";
 const LOAD_OVER = "#DC2626";
+const AGENCY_TX = "#6D28D9";
+const AGENCY_BG = "#F5F3FF";
+const AGENCY_BORDER = "#C4B5FD";
+const AGENCY_PILL = "#EDE9FE";
+const TAB_YEARS = {
+  today: 0,
+  m6: 0.5,
+  m12: 1
+};
 const UNASSIGNED = "__unassigned__";
 const STORE_KEY = "boreal-accountability-v2";
 const DEFAULT_TARGET = 5;
@@ -176,10 +185,33 @@ const generateJD = async ({
   const out = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
   return out || "(The model returned an empty response — try again.)";
 };
-const isVacant = p => !p.name || !p.name.trim();
+const isAgency = p => !!p && p.type === "agency";
+const isVacant = p => !isAgency(p) && (!p.name || !p.name.trim());
 const cardWeight = c => WEIGHT[c.weight] || 2;
-const colLabel = col => col.id === UNASSIGNED ? "Unassigned" : col.name && col.name.trim() || col.role && col.role.trim() || "Open role";
-const fmtMoney = n => "$" + (Number(n) || 0).toLocaleString("en-US");
+const colLabel = col => col.id === UNASSIGNED ? "Unassigned" : col.name && col.name.trim() || col.role && col.role.trim() || (isAgency(col) ? "New agency" : "Open role");
+const totalCost = p => {
+  if (!p) return 0;
+  if (isAgency(p)) return Number(p.fee != null ? p.fee : p.cost) || 0;
+  if (p.salary != null || p.benefits != null || p.other != null) return (Number(p.salary) || 0) + (Number(p.benefits) || 0) + (Number(p.other) || 0);
+  return Number(p.cost) || 0;
+};
+const projectedCost = (p, years) => {
+  years = years || 0;
+  if (!p) return 0;
+  if (isAgency(p)) {
+    const fee = Number(p.fee != null ? p.fee : p.cost) || 0;
+    const esc = (Number(p.feeGrowth) || 0) / 100;
+    if (p.contractMode === "fixed") {
+      const term = Number(p.contractYears) || 0;
+      if (term > 0 && years >= term) return 0;
+    }
+    return fee * Math.pow(1 + esc, years);
+  }
+  const grow = (amt, rate) => (Number(amt) || 0) * Math.pow(1 + (Number(rate) || 0) / 100, years);
+  if (p.salary != null || p.benefits != null || p.other != null) return grow(p.salary, p.salaryGrowth) + grow(p.benefits, p.benefitsGrowth) + grow(p.other, p.otherGrowth);
+  return grow(p.cost, p.costGrowth);
+};
+const fmtMoney = n => "$" + Math.round(Number(n) || 0).toLocaleString("en-US");
 const respKey = c => norm(c.func) + "¦" + norm(c.desc);
 const seatMatchable = (a, b) => {
   const ra = norm(a.role),
@@ -412,6 +444,35 @@ const IconScale = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/Rea
 }), /*#__PURE__*/React.createElement("path", {
   d: "M8 21h8"
 }));
+const IconChart = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
+  d: "M3 3v18h18"
+}), /*#__PURE__*/React.createElement("rect", {
+  x: "7",
+  y: "12",
+  width: "3",
+  height: "6"
+}), /*#__PURE__*/React.createElement("rect", {
+  x: "12",
+  y: "8",
+  width: "3",
+  height: "10"
+}), /*#__PURE__*/React.createElement("rect", {
+  x: "17",
+  y: "5",
+  width: "3",
+  height: "13"
+}));
+const IconBuilding = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("rect", {
+  x: "4",
+  y: "3",
+  width: "11",
+  height: "18",
+  rx: "1"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M15 9h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 7h3M8 11h3M8 15h3"
+}));
 const IconDoc = p => /*#__PURE__*/React.createElement(Svg, p, /*#__PURE__*/React.createElement("path", {
   d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
 }), /*#__PURE__*/React.createElement("path", {
@@ -601,25 +662,34 @@ function diffViews(src, dst) {
     hasChanges
   };
 }
-function scenarioStats(v, target) {
+function scenarioStats(v, target, years) {
+  years = years || 0;
   const people = (v && v.people) || [];
   const cards = (v && v.cards) || [];
   const loadOf = pid => cards.filter(c => c.personId === pid).reduce((a, c) => a + cardWeight(c), 0);
   const heavyOf = pid => cards.filter(c => c.personId === pid && c.weight === "L").length;
-  const filled = people.filter(p => !isVacant(p));
-  const open = people.filter(p => isVacant(p));
+  const employees = people.filter(p => !isAgency(p));
+  const agencies = people.filter(isAgency);
+  const filled = employees.filter(p => !isVacant(p));
+  const open = employees.filter(p => isVacant(p));
   const overloaded = people.filter(p => loadOf(p.id) > target).map(p => ({
     label: colLabel(p),
     load: loadOf(p.id),
-    vacant: isVacant(p)
+    vacant: isVacant(p),
+    agency: isAgency(p)
   })).sort((a, b) => b.load - a.load);
   const keyRisks = filled.filter(p => heavyOf(p.id) >= 2).map(p => colLabel(p));
   const unassigned = cards.filter(c => !c.personId || c.personId === UNASSIGNED).map(c => c.desc && c.desc.trim() || c.func && c.func.trim() || "Untitled responsibility");
-  const cost = people.reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  const peopleCost = employees.reduce((a, p) => a + projectedCost(p, years), 0);
+  const agencyCost = agencies.reduce((a, p) => a + projectedCost(p, years), 0);
   return {
     filled: filled.length,
     open: open.length,
-    cost,
+    agencies: agencies.length,
+    agencyLabels: agencies.map(colLabel),
+    cost: peopleCost + agencyCost,
+    peopleCost,
+    agencyCost,
     overloaded,
     keyRisks,
     unassigned,
@@ -637,6 +707,7 @@ function App() {
   const [overCol, setOverCol] = useState(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [projOpen, setProjOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [genFunc, setGenFunc] = useState("Marketing");
   const [genGrain, setGenGrain] = useState(2);
@@ -747,7 +818,7 @@ function App() {
   };
   const managerOptionsFor = id => {
     const banned = descendantsOf(id);
-    return view.people.filter(p => p.id !== id && !banned.has(p.id)).map(p => ({
+    return view.people.filter(p => p.id !== id && !banned.has(p.id) && !isAgency(p)).map(p => ({
       id: p.id,
       label: colLabel(p)
     }));
@@ -930,6 +1001,20 @@ function App() {
     };
     setPeople(p => [...p, newP]);
   };
+  const addAgency = () => {
+    setPeople(p => [...p, {
+      id: uid(),
+      type: "agency",
+      name: "",
+      role: "",
+      fee: 0,
+      cost: 0,
+      feeGrowth: 0,
+      contractMode: "ongoing",
+      contractYears: 0,
+      _new: true
+    }]);
+  };
   const updatePerson = (id, patch) => setPeople(p => p.map(x => x.id === id ? {
     ...x,
     ...patch
@@ -1062,12 +1147,15 @@ function App() {
       setTab("today");
     }
   };
-  const filled = view.people.filter(p => !isVacant(p)).length;
-  const open = view.people.filter(p => isVacant(p)).length;
+  const yrs = TAB_YEARS[tab] || 0;
+  const filled = view.people.filter(p => !isAgency(p) && !isVacant(p)).length;
+  const open = view.people.filter(p => !isAgency(p) && isVacant(p)).length;
+  const agencyCount = view.people.filter(isAgency).length;
   const overloaded = view.people.filter(p => seatLoad(p.id) > target).length;
-  const keyRisks = view.people.filter(p => !isVacant(p) && keyRiskOf(p.id)).length;
-  const headcountCost = view.people.reduce((a, p) => a + (Number(p.cost) || 0), 0);
-  const toHireCost = view.people.filter(isVacant).reduce((a, p) => a + (Number(p.cost) || 0), 0);
+  const keyRisks = view.people.filter(p => !isAgency(p) && !isVacant(p) && keyRiskOf(p.id)).length;
+  const headcountCost = view.people.filter(p => !isAgency(p)).reduce((a, p) => a + projectedCost(p, yrs), 0);
+  const agencyCost = view.people.filter(isAgency).reduce((a, p) => a + projectedCost(p, yrs), 0);
+  const toHireCost = view.people.filter(isVacant).reduce((a, p) => a + projectedCost(p, yrs), 0);
   const prevKey = PREV[tab];
   const emptyFuture = tab !== "today" && view.people.length === 0 && view.cards.length === 0;
   const chip = (label, val, color) => /*#__PURE__*/React.createElement("span", {
@@ -1179,7 +1267,17 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(IconScale, {
     size: 15
-  }), " Compare"), prevKey && /*#__PURE__*/React.createElement("button", {
+  }), " Compare"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setProjOpen(true),
+    className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
+    style: {
+      color: TEAL,
+      border: "1px solid " + COL_BORDER,
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement(IconChart, {
+    size: 15
+  }), " Projection"), prevKey && /*#__PURE__*/React.createElement("button", {
     onClick: () => copyFrom(prevKey),
     className: "ab-btn flex items-center gap-2 text-sm font-medium rounded-full px-3 py-2",
     style: {
@@ -1199,6 +1297,16 @@ function App() {
   }, /*#__PURE__*/React.createElement(IconUserPlus, {
     size: 16
   }), " ", tab === "today" ? "Add teammate" : "Add role"), /*#__PURE__*/React.createElement("button", {
+    onClick: addAgency,
+    className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
+    style: {
+      background: AGENCY_TX,
+      color: "#fff"
+    },
+    title: "Add a third-party agency, freelancer, or outsourced resource"
+  }, /*#__PURE__*/React.createElement(IconBuilding, {
+    size: 15
+  }), " Add agency"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShareOpen(true),
     className: "ab-btn flex items-center gap-2 text-sm font-semibold rounded-full px-3 py-2",
     style: {
@@ -1269,7 +1377,7 @@ function App() {
     className: "flex items-center justify-between gap-3 flex-wrap mb-5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2 flex-wrap"
-  }, chip(filled === 1 ? "person" : "people", filled), open > 0 && chip(open === 1 ? "open role" : "open roles", open, AMBER_TX), chip("responsibilities", view.cards.length), chip("headcount cost", fmtMoney(headcountCost)), toHireCost > 0 && chip("to hire", fmtMoney(toHireCost), AMBER_TX), overloaded > 0 && chip(overloaded === 1 ? "overloaded seat" : "overloaded seats", overloaded, LOAD_OVER), keyRisks > 0 && chip(keyRisks === 1 ? "key-person risk" : "key-person risks", keyRisks, LOAD_OVER), /*#__PURE__*/React.createElement("span", {
+  }, chip(filled === 1 ? "person" : "people", filled), open > 0 && chip(open === 1 ? "open role" : "open roles", open, AMBER_TX), agencyCount > 0 && chip(agencyCount === 1 ? "agency" : "agencies", agencyCount, AGENCY_TX), chip("responsibilities", view.cards.length), chip("people cost", fmtMoney(headcountCost)), agencyCost > 0 && chip("agency cost", fmtMoney(agencyCost), AGENCY_TX), toHireCost > 0 && chip("to hire", fmtMoney(toHireCost), AMBER_TX), overloaded > 0 && chip(overloaded === 1 ? "overloaded seat" : "overloaded seats", overloaded, LOAD_OVER), keyRisks > 0 && chip(keyRisks === 1 ? "key-person risk" : "key-person risks", keyRisks, LOAD_OVER), /*#__PURE__*/React.createElement("span", {
     className: "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs",
     style: {
       background: "#fff",
@@ -1345,7 +1453,8 @@ function App() {
     people: view.people,
     cards: view.cards,
     target: target,
-    onReparent: reparent
+    onReparent: reparent,
+    yrs: yrs
   }) : groupBy === "function" ? /*#__PURE__*/React.createElement("div", {
     className: isMobile ? "flex flex-col gap-3 pb-4" : "flex gap-4 overflow-x-auto pb-4 items-start"
   }, funcNames.length === 0 && /*#__PURE__*/React.createElement("div", {
@@ -1424,10 +1533,11 @@ function App() {
   }, columns.map(col => {
     const isUn = col.id === UNASSIGNED;
     const vacant = !isUn && isVacant(col);
+    const ag = isAgency(col);
     const colCards = cardsFor(col.id);
     const isOver = overCol === col.id;
-    const bg = isOver ? DROP_BG : vacant ? VACANT_BG : "#fff";
-    const bc = isOver ? TEAL : vacant ? AMBER_BORDER : COL_BORDER;
+    const bg = isOver ? DROP_BG : ag ? AGENCY_BG : vacant ? VACANT_BG : "#fff";
+    const bc = isOver ? TEAL : ag ? AGENCY_BORDER : vacant ? AMBER_BORDER : COL_BORDER;
     const bs = isOver || vacant ? "dashed" : "solid";
     const seatSugg = !isUn && suggestions.find(s => s.kind === "removeSeat" && s.seatId === col.id);
     return /*#__PURE__*/React.createElement("div", {
@@ -1474,7 +1584,9 @@ function App() {
       onRejectSuggestion: removeSuggestion,
       managerOptions: isUn ? [] : managerOptionsFor(col.id),
       managerLabel: isUn ? "" : managerLabelOf(col.id),
-      reportCount: isUn ? 0 : reportsOf(col.id).length
+      reportCount: isUn ? 0 : reportsOf(col.id).filter(p => !isAgency(p)).length,
+      managesLabels: isUn ? [] : reportsOf(col.id).filter(isAgency).map(colLabel),
+      yrs: TAB_YEARS[tab] || 0
     }), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-col gap-3",
       style: {
@@ -1529,6 +1641,10 @@ function App() {
     initialB: NEXT[tab] || PREV[tab] || "m6",
     onGoto: setTab,
     onClose: () => setCompareOpen(false)
+  }), projOpen && /*#__PURE__*/React.createElement(ProjectionModal, {
+    views: views,
+    initialScn: tab,
+    onClose: () => setProjOpen(false)
   }), genOpen && /*#__PURE__*/React.createElement(GeneratorPanel, {
     func: genFunc,
     setFunc: setGenFunc,
@@ -2267,116 +2383,216 @@ function ColumnHeader({
   onRejectSuggestion,
   managerOptions,
   managerLabel,
-  reportCount
+  reportCount,
+  yrs,
+  managesLabels
 }) {
   const [editing, setEditing] = useState(col._new || false);
+  const agency = isAgency(col);
+  const dcost = projectedCost(col, yrs || 0);
+  const manages = managesLabels || [];
+  const [cmode, setCmode] = useState(col.contractMode || "ongoing");
   const roleRef = useRef(null);
   const nameRef = useRef(null);
-  const costRef = useRef(null);
   const mgrRef = useRef(null);
+  const salaryRef = useRef(null);
+  const benefitsRef = useRef(null);
+  const otherRef = useRef(null);
+  const salaryGRef = useRef(null);
+  const benefitsGRef = useRef(null);
+  const otherGRef = useRef(null);
+  const feeRef = useRef(null);
+  const feeGRef = useRef(null);
+  const yearsRef = useRef(null);
+  const num = r => parseInt((r.current && r.current.value || "").replace(/[^0-9]/g, "")) || 0;
+  const pct = r => {
+    const v = parseFloat((r.current && r.current.value || "").replace(/[^0-9.]/g, ""));
+    return isNaN(v) ? 0 : v;
+  };
   const save = () => {
     const role = roleRef.current.value.trim();
     const name = nameRef.current.value.trim();
-    const cost = parseInt((costRef.current.value || "").replace(/[^0-9]/g, "")) || 0;
     const managerId = mgrRef.current && mgrRef.current.value || null;
-    if (!role && !name) {
-      if (col._new) {
-        onDelete(col.id);
-        return;
-      }
+    if (!role && !name && col._new) {
+      onDelete(col.id);
+      return;
     }
-    onUpdate(col.id, {
-      role,
-      name,
-      cost,
-      managerId,
-      _new: false
-    });
+    if (agency) {
+      const fee = num(feeRef);
+      onUpdate(col.id, {
+        type: "agency",
+        role,
+        name,
+        fee,
+        cost: fee,
+        feeGrowth: pct(feeGRef),
+        contractMode: cmode,
+        contractYears: cmode === "fixed" ? num(yearsRef) : 0,
+        managerId,
+        _new: false
+      });
+    } else {
+      const salary = num(salaryRef),
+        benefits = num(benefitsRef),
+        other = num(otherRef);
+      onUpdate(col.id, {
+        type: "employee",
+        role,
+        name,
+        salary,
+        benefits,
+        other,
+        cost: salary + benefits + other,
+        salaryGrowth: pct(salaryGRef),
+        benefitsGrowth: pct(benefitsGRef),
+        otherGrowth: pct(otherGRef),
+        managerId,
+        _new: false
+      });
+    }
     setEditing(false);
   };
+  const accent = agency ? AGENCY_TX : TEAL;
+  const fieldStyle = {
+    border: "1px solid " + COL_BORDER,
+    color: SLATE
+  };
+  const lbl = txt => /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-semibold mb-1",
+    style: {
+      color: "#52635A"
+    }
+  }, txt);
+  const txtInput = (ref, def, ph, auto) => /*#__PURE__*/React.createElement("input", {
+    ref: ref,
+    autoFocus: auto || false,
+    defaultValue: def || "",
+    placeholder: ph,
+    onKeyDown: e => {
+      if (e.key === "Enter") save();
+    },
+    className: "w-full rounded px-2 py-1 text-sm bg-white",
+    style: fieldStyle
+  });
+  const moneyRow = (label, amtRef, amtDef, grRef, grDef, grLabel) => /*#__PURE__*/React.createElement("div", {
+    className: "mb-2"
+  }, lbl(label), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 items-center"
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: amtRef,
+    defaultValue: amtDef == null ? "" : amtDef,
+    placeholder: "0",
+    inputMode: "numeric",
+    onKeyDown: e => {
+      if (e.key === "Enter") save();
+    },
+    className: "flex-1 min-w-0 rounded px-2 py-1 text-sm bg-white",
+    style: fieldStyle
+  }), /*#__PURE__*/React.createElement("input", {
+    ref: grRef,
+    defaultValue: grDef == null ? "" : grDef,
+    placeholder: "0",
+    inputMode: "decimal",
+    title: grLabel,
+    onKeyDown: e => {
+      if (e.key === "Enter") save();
+    },
+    className: "w-12 rounded px-1.5 py-1 text-sm bg-white text-right",
+    style: fieldStyle
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs flex-shrink-0",
+    style: {
+      color: "#7C8B80"
+    }
+  }, "%/yr")));
+  const mgrSelect = /*#__PURE__*/React.createElement("select", {
+    ref: mgrRef,
+    defaultValue: col.managerId || "",
+    className: "w-full rounded px-2 py-1 text-sm bg-white",
+    style: fieldStyle
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, agency ? "— Not managed —" : "— No one (top of org) —"), (managerOptions || []).map(o => /*#__PURE__*/React.createElement("option", {
+    key: o.id,
+    value: o.id
+  }, o.label)));
   if (editing && !isUn) {
+    const formChildren = agency ? [/*#__PURE__*/React.createElement("div", {
+      key: "tag",
+      className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mb-2",
+      style: {
+        background: AGENCY_PILL,
+        color: AGENCY_TX
+      }
+    }, "Third-party / agency"), /*#__PURE__*/React.createElement("div", {
+      key: "name"
+    }, lbl("Agency / resource name"), txtInput(nameRef, col.name, "e.g. Acme Ad Agency", true)), /*#__PURE__*/React.createElement("div", {
+      key: "scope",
+      className: "mt-2"
+    }, lbl("Scope / what they do"), txtInput(roleRef, col.role, "e.g. Paid media & creative")), /*#__PURE__*/React.createElement("div", {
+      key: "fee",
+      className: "mt-2"
+    }, moneyRow("Annual fee ($/yr)", feeRef, col.fee != null ? col.fee : col.cost, feeGRef, col.feeGrowth, "Annual fee escalator %")), /*#__PURE__*/React.createElement("div", {
+      key: "contract",
+      className: "mb-2"
+    }, lbl("Contract"), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-2 items-center"
+    }, /*#__PURE__*/React.createElement("select", {
+      defaultValue: cmode,
+      onChange: e => setCmode(e.target.value),
+      className: "flex-1 rounded px-2 py-1 text-sm bg-white",
+      style: fieldStyle
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "ongoing"
+    }, "Ongoing (keeps billing)"), /*#__PURE__*/React.createElement("option", {
+      value: "fixed"
+    }, "Fixed term")), cmode === "fixed" && /*#__PURE__*/React.createElement("input", {
+      ref: yearsRef,
+      defaultValue: col.contractYears || "",
+      placeholder: "yrs",
+      inputMode: "numeric",
+      title: "Contract length in years",
+      className: "w-16 rounded px-2 py-1 text-sm bg-white text-right",
+      style: fieldStyle
+    }), cmode === "fixed" && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs flex-shrink-0",
+      style: {
+        color: "#7C8B80"
+      }
+    }, "yrs"))), /*#__PURE__*/React.createElement("div", {
+      key: "mgr",
+      className: "mt-1"
+    }, lbl("Managed by"), mgrSelect)] : [/*#__PURE__*/React.createElement("div", {
+      key: "role"
+    }, lbl("Role / title"), txtInput(roleRef, col.role, "e.g. Senior Developer", true)), /*#__PURE__*/React.createElement("div", {
+      key: "name",
+      className: "mt-2"
+    }, lbl("Name "), /*#__PURE__*/React.createElement("span", {
+      className: "text-[11px]",
+      style: {
+        color: "#9AA89E"
+      }
+    }, "(leave blank for an open role)"), txtInput(nameRef, col.name, "e.g. Priya Singh")), /*#__PURE__*/React.createElement("div", {
+      key: "compstart",
+      className: "mt-2 mb-1 text-[11px] font-semibold flex items-center justify-between",
+      style: {
+        color: "#52635A"
+      }
+    }, /*#__PURE__*/React.createElement("span", null, "Annual cost"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#9AA89E"
+      }
+    }, "amount · raise")), moneyRow("Salary ($/yr)", salaryRef, col.salary != null ? col.salary : col.cost, salaryGRef, col.salaryGrowth, "Annual salary increase %"), moneyRow("Benefits ($/yr)", benefitsRef, col.benefits, benefitsGRef, col.benefitsGrowth, "Annual benefits increase %"), moneyRow("Other ($/yr)", otherRef, col.other, otherGRef, col.otherGrowth, "Annual increase %"), /*#__PURE__*/React.createElement("div", {
+      key: "mgr",
+      className: "mt-1"
+    }, lbl("Reports to"), mgrSelect)];
     return /*#__PURE__*/React.createElement("div", {
       className: "mb-3 rounded-lg p-2",
       style: {
-        background: "#F4F9F5",
-        border: "1px solid " + COL_BORDER
+        background: agency ? AGENCY_BG : "#F4F9F5",
+        border: "1px solid " + (agency ? AGENCY_BORDER : COL_BORDER)
       }
-    }, /*#__PURE__*/React.createElement("label", {
-      className: "block text-xs font-semibold mb-1",
-      style: {
-        color: "#52635A"
-      }
-    }, "Role / title"), /*#__PURE__*/React.createElement("input", {
-      ref: roleRef,
-      autoFocus: true,
-      defaultValue: col.role,
-      placeholder: "e.g. Senior Developer",
-      onKeyDown: e => {
-        if (e.key === "Enter") save();
-      },
-      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
-      style: {
-        border: "1px solid " + COL_BORDER,
-        color: SLATE
-      }
-    }), /*#__PURE__*/React.createElement("label", {
-      className: "block text-xs font-semibold mb-1",
-      style: {
-        color: "#52635A"
-      }
-    }, "Name ", /*#__PURE__*/React.createElement("span", {
-      className: "font-normal"
-    }, "(leave blank for an open role)")), /*#__PURE__*/React.createElement("input", {
-      ref: nameRef,
-      defaultValue: col.name,
-      placeholder: "e.g. Priya Singh",
-      onKeyDown: e => {
-        if (e.key === "Enter") save();
-      },
-      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
-      style: {
-        border: "1px solid " + COL_BORDER,
-        color: SLATE
-      }
-    }), /*#__PURE__*/React.createElement("label", {
-      className: "block text-xs font-semibold mb-1",
-      style: {
-        color: "#52635A"
-      }
-    }, "Target cost ", /*#__PURE__*/React.createElement("span", {
-      className: "font-normal"
-    }, "($ / year, optional)")), /*#__PURE__*/React.createElement("input", {
-      ref: costRef,
-      defaultValue: col.cost || "",
-      placeholder: "e.g. 120000",
-      inputMode: "numeric",
-      onKeyDown: e => {
-        if (e.key === "Enter") save();
-      },
-      className: "w-full mb-2 rounded px-2 py-1 text-sm bg-white",
-      style: {
-        border: "1px solid " + COL_BORDER,
-        color: SLATE
-      }
-    }), /*#__PURE__*/React.createElement("label", {
-      className: "block text-xs font-semibold mb-1",
-      style: {
-        color: "#52635A"
-      }
-    }, "Reports to"), /*#__PURE__*/React.createElement("select", {
-      ref: mgrRef,
-      defaultValue: col.managerId || "",
-      className: "w-full rounded px-2 py-1 text-sm bg-white",
-      style: {
-        border: "1px solid " + COL_BORDER,
-        color: SLATE
-      }
-    }, /*#__PURE__*/React.createElement("option", {
-      value: ""
-    }, "— No one (top of org) —"), (managerOptions || []).map(o => /*#__PURE__*/React.createElement("option", {
-      key: o.id,
-      value: o.id
-    }, o.label))), /*#__PURE__*/React.createElement("div", {
+    }, formChildren, /*#__PURE__*/React.createElement("div", {
       className: "flex justify-end gap-2 mt-2"
     }, /*#__PURE__*/React.createElement("button", {
       onClick: () => {
@@ -2394,7 +2610,7 @@ function ColumnHeader({
       onClick: save,
       className: "ab-btn p-1.5 rounded-full",
       style: {
-        background: TEAL,
+        background: accent,
         color: "#fff"
       },
       title: "Save"
@@ -2414,7 +2630,31 @@ function ColumnHeader({
     style: {
       color: "#7C8B80"
     }
-  }, "Unassigned") : vacant ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "Unassigned") : agency ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mb-1",
+    style: {
+      background: AGENCY_PILL,
+      color: AGENCY_TX
+    }
+  }, /*#__PURE__*/React.createElement(IconBuilding, {
+    size: 10
+  }), "Third-party"), /*#__PURE__*/React.createElement("h2", {
+    className: "font-bold text-lg leading-tight truncate",
+    style: {
+      color: AGENCY_TX
+    },
+    title: col.name
+  }, col.name && col.name.trim() || "New agency"), col.role && col.role.trim() && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs truncate",
+    style: {
+      color: "#9180C9"
+    }
+  }, col.role), dcost > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "text-xs",
+    style: {
+      color: AGENCY_TX
+    }
+  }, fmtMoney(dcost), "/yr · ", col.contractMode === "fixed" && col.contractYears > 0 ? col.contractYears + "-yr contract" : "ongoing")) : vacant ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "inline-block text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mb-1",
     style: {
       background: AMBER_PILL,
@@ -2426,12 +2666,12 @@ function ColumnHeader({
       color: AMBER_TX
     },
     title: col.role
-  }, col.role && col.role.trim() || "Untitled role"), col.cost > 0 && /*#__PURE__*/React.createElement("div", {
+  }, col.role && col.role.trim() || "Untitled role"), dcost > 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-xs",
     style: {
       color: AMBER_TX
     }
-  }, fmtMoney(col.cost), "/yr to hire")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+  }, fmtMoney(dcost), "/yr to hire")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
     className: "font-bold text-lg leading-tight truncate",
     style: {
       color: SLATE
@@ -2442,12 +2682,12 @@ function ColumnHeader({
     style: {
       color: "#7C8B80"
     }
-  }, col.role), col.cost > 0 && /*#__PURE__*/React.createElement("div", {
+  }, col.role), dcost > 0 && /*#__PURE__*/React.createElement("div", {
     className: "text-xs",
     style: {
       color: "#7C8B80"
     }
-  }, fmtMoney(col.cost), "/yr"), keyRisk && /*#__PURE__*/React.createElement("span", {
+  }, fmtMoney(dcost), "/yr"), keyRisk && /*#__PURE__*/React.createElement("span", {
     className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 mt-1",
     style: {
       background: "#FEE2E2",
@@ -2456,16 +2696,25 @@ function ColumnHeader({
     title: "Holds multiple critical responsibilities alone"
   }, /*#__PURE__*/React.createElement(IconWarn, {
     size: 11
-  }), " Key-person risk")), !isUn && (managerLabel || reportCount > 0) && /*#__PURE__*/React.createElement("div", {
-    className: "text-[11px] mt-1 flex flex-wrap gap-x-2",
+  }), " Key-person risk")), !isUn && (managerLabel || reportCount > 0 || manages.length > 0) && /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] mt-1 flex flex-wrap gap-x-2 gap-y-0.5 items-center",
     style: {
       color: "#7C8B80"
     }
-  }, managerLabel && /*#__PURE__*/React.createElement("span", null, "↳ reports to ", /*#__PURE__*/React.createElement("span", {
+  }, managerLabel && /*#__PURE__*/React.createElement("span", null, agency ? "↳ managed by " : "↳ reports to ", /*#__PURE__*/React.createElement("span", {
     style: {
       fontWeight: 600
     }
-  }, managerLabel)), reportCount > 0 && /*#__PURE__*/React.createElement("span", null, reportCount, reportCount === 1 ? " report" : " reports"))), !isUn && /*#__PURE__*/React.createElement("div", {
+  }, managerLabel)), reportCount > 0 && /*#__PURE__*/React.createElement("span", null, reportCount, reportCount === 1 ? " report" : " reports"), manages.length > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold",
+    style: {
+      background: AGENCY_PILL,
+      color: AGENCY_TX
+    },
+    title: "Manages: " + manages.join(", ")
+  }, /*#__PURE__*/React.createElement(IconBuilding, {
+    size: 10
+  }), "Managing ", manages.length === 1 ? manages[0] : manages.length + " agencies"))), !isUn && /*#__PURE__*/React.createElement("div", {
     className: "flex gap-1 flex-shrink-0"
   }, onComments && /*#__PURE__*/React.createElement("button", {
     onClick: () => onComments(),
@@ -2880,8 +3129,8 @@ function CompareModal({
   const [aKey, setAKey] = useState(initialA || "today");
   const [bKey, setBKey] = useState(initialB || NEXT[initialA] || "m6");
   const same = aKey === bKey;
-  const sa = scenarioStats(views[aKey], target);
-  const sb = scenarioStats(views[bKey], target);
+  const sa = scenarioStats(views[aKey], target, TAB_YEARS[aKey] || 0);
+  const sb = scenarioStats(views[bKey], target, TAB_YEARS[bKey] || 0);
   const sel = (val, set) => /*#__PURE__*/React.createElement("select", {
     value: val,
     onChange: e => set(e.target.value),
@@ -2906,6 +3155,24 @@ function CompareModal({
     b: sb.open,
     fmt: n => n,
     dir: 0
+  }, {
+    label: "Agencies",
+    a: sa.agencies,
+    b: sb.agencies,
+    fmt: n => n,
+    dir: 0
+  }, {
+    label: "People cost / yr",
+    a: sa.peopleCost,
+    b: sb.peopleCost,
+    fmt: fmtMoney,
+    dir: -1
+  }, {
+    label: "Agency cost / yr",
+    a: sa.agencyCost,
+    b: sb.agencyCost,
+    fmt: fmtMoney,
+    dir: -1
   }, {
     label: "Total annual cost",
     a: sa.cost,
@@ -3196,6 +3463,252 @@ function CompareModal({
   }, deltaCell(m))))), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col sm:flex-row gap-3"
   }, sideColumn(aKey, sa), sideColumn(bKey, sb)))), /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end gap-2 px-5 py-3",
+    style: {
+      borderTop: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn text-sm font-semibold rounded-full px-4 py-2",
+    style: {
+      background: TEAL,
+      color: "#fff"
+    }
+  }, "Done"))));
+}
+function ProjectionModal({
+  views,
+  initialScn,
+  onClose
+}) {
+  const [scn, setScn] = useState(initialScn || "today");
+  const [horizon, setHorizon] = useState(5);
+  const roster = (views[scn] && views[scn].people) || [];
+  const years = [];
+  for (let i = 0; i <= horizon; i++) years.push(i);
+  const series = years.map(y => {
+    let ppl = 0,
+      ag = 0;
+    roster.forEach(p => {
+      const c = projectedCost(p, y);
+      if (isAgency(p)) ag += c;else ppl += c;
+    });
+    return {
+      year: y,
+      ppl,
+      ag,
+      total: ppl + ag
+    };
+  });
+  const maxTotal = Math.max(1, ...series.map(s => s.total));
+  const cumPpl = series.reduce((a, s) => a + s.ppl, 0);
+  const cumAg = series.reduce((a, s) => a + s.ag, 0);
+  const hasAgency = roster.some(isAgency);
+  const H = 170,
+    padL = 8,
+    padR = 8,
+    step = (640 - padL - padR) / series.length,
+    barW = Math.min(46, step * 0.62);
+  const yOf = v => H - v / maxTotal * H;
+  const sel = (val, set, opts) => /*#__PURE__*/React.createElement("select", {
+    value: val,
+    onChange: e => set(e.target.value),
+    className: "rounded-md px-2 py-1 text-sm bg-white font-semibold",
+    style: {
+      border: "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, opts);
+  const legend = (color, label) => /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1.5 text-xs",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 10,
+      height: 10,
+      borderRadius: 2,
+      background: color,
+      display: "inline-block"
+    }
+  }), label);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto",
+    style: {
+      background: "rgba(13,33,22,.5)"
+    },
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded-xl bg-white w-full max-w-3xl my-8",
+    onClick: e => e.stopPropagation(),
+    style: {
+      boxShadow: "0 20px 60px rgba(0,0,0,.3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 px-5 py-4",
+    style: {
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 flex-wrap text-sm",
+    style: {
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: TEAL
+    }
+  }, /*#__PURE__*/React.createElement(IconChart, {
+    size: 17
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold"
+  }, "Cost projection:"), sel(scn, setScn, TABS.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.key,
+    value: t.key
+  }, t.label))), sel(String(horizon), v => setHorizon(parseInt(v)), [3, 5, 10].map(n => /*#__PURE__*/React.createElement("option", {
+    key: n,
+    value: String(n)
+  }, n + " years")))), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    className: "ab-btn p-1.5 rounded-full hover:bg-black/5",
+    style: {
+      color: "#52635A"
+    }
+  }, /*#__PURE__*/React.createElement(IconX, {
+    size: 18
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-5 py-4"
+  }, roster.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm",
+    style: {
+      color: "#52635A"
+    }
+  }, "This scenario has no people or agencies yet. Add some, set their salaries/fees and annual % increases, then project.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-4 mb-2"
+  }, legend(TEAL, "People"), hasAgency && legend(AGENCY_TX, "Agencies"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs ml-auto",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "Peak ", fmtMoney(maxTotal), "/yr")), /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 640 " + (H + 26),
+    width: "100%",
+    style: {
+      display: "block"
+    }
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: 0,
+    y1: H,
+    x2: 640,
+    y2: H,
+    stroke: COL_BORDER
+  }), series.map((s, i) => {
+    const x = padL + i * step + (step - barW) / 2;
+    const pplH = H - yOf(s.ppl);
+    const agH = H - yOf(s.ag);
+    return /*#__PURE__*/React.createElement("g", {
+      key: i
+    }, /*#__PURE__*/React.createElement("rect", {
+      x: x,
+      y: H - pplH,
+      width: barW,
+      height: pplH,
+      fill: TEAL,
+      rx: 1
+    }), agH > 0 && /*#__PURE__*/React.createElement("rect", {
+      x: x,
+      y: H - pplH - agH,
+      width: barW,
+      height: agH,
+      fill: AGENCY_TX,
+      rx: 1
+    }), /*#__PURE__*/React.createElement("text", {
+      x: x + barW / 2,
+      y: H - pplH - agH - 4,
+      textAnchor: "middle",
+      style: {
+        fontSize: 9,
+        fill: "#52635A",
+        fontWeight: 600
+      }
+    }, "$" + Math.round(s.total / 1000) + "k"), /*#__PURE__*/React.createElement("text", {
+      x: x + barW / 2,
+      y: H + 16,
+      textAnchor: "middle",
+      style: {
+        fontSize: 10,
+        fill: "#7C8B80"
+      }
+    }, s.year === 0 ? "Now" : "Yr " + s.year));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "rounded-lg overflow-hidden mt-4",
+    style: {
+      border: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "grid text-xs font-bold uppercase tracking-wide",
+    style: {
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      background: "#F4F9F5",
+      color: "#52635A",
+      borderBottom: "1px solid " + COL_BORDER
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2"
+  }, "Year"), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, "People"), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, "Agencies"), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, "Total")), series.map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "grid text-sm items-center",
+    style: {
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      borderTop: i === 0 ? "none" : "1px solid " + COL_BORDER,
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-1.5",
+    style: {
+      color: "#52635A"
+    }
+  }, s.year === 0 ? "Now" : "Year " + s.year), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-1.5 text-right"
+  }, fmtMoney(s.ppl)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-1.5 text-right",
+    style: {
+      color: s.ag > 0 ? AGENCY_TX : "#9AA89E"
+    }
+  }, fmtMoney(s.ag)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-1.5 text-right font-semibold"
+  }, fmtMoney(s.total)))), /*#__PURE__*/React.createElement("div", {
+    className: "grid text-sm items-center font-bold",
+    style: {
+      gridTemplateColumns: "1fr 1fr 1fr 1fr",
+      borderTop: "2px solid " + COL_BORDER,
+      background: "#F7FAF7",
+      color: SLATE
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2"
+  }, horizon + "-yr total"), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, fmtMoney(cumPpl)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right",
+    style: {
+      color: cumAg > 0 ? AGENCY_TX : "#9AA89E"
+    }
+  }, fmtMoney(cumAg)), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-2 text-right"
+  }, fmtMoney(cumPpl + cumAg)))), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] mt-3",
+    style: {
+      color: "#9AA89E"
+    }
+  }, "Salaries, benefits, and fees grow by each resource's annual % each year. Fixed-term agencies stop billing when their contract ends; ongoing agencies keep billing (with any escalator). Year 0 is today's run-rate."))), /*#__PURE__*/React.createElement("div", {
     className: "flex justify-end gap-2 px-5 py-3",
     style: {
       borderTop: "1px solid " + COL_BORDER
@@ -3600,7 +4113,8 @@ function OrgChart({
   people,
   cards,
   target,
-  onReparent
+  onReparent,
+  yrs
 }) {
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
@@ -3637,20 +4151,22 @@ function OrgChart({
   const rollup = id => {
     let filled = 0,
       open = 0,
+      agencies = 0,
       cost = 0;
     descOf(id).forEach(did => {
       const pp = people.find(p => p.id === did);
       if (!pp) return;
-      cost += Number(pp.cost) || 0;
-      if (isVacant(pp)) open++;else filled++;
+      cost += projectedCost(pp, yrs || 0);
+      if (isAgency(pp)) agencies++;else if (isVacant(pp)) open++;else filled++;
     });
     return {
       filled,
       open,
+      agencies,
       cost
     };
   };
-  const canDrop = targetId => dragId && dragId !== targetId && !descOf(dragId).has(targetId) && targetId !== ((people.find(p => p.id === dragId) || {}).managerId || null);
+  const canDrop = targetId => dragId && dragId !== targetId && !descOf(dragId).has(targetId) && !isAgency(people.find(p => p.id === targetId)) && targetId !== ((people.find(p => p.id === dragId) || {}).managerId || null);
   const seen = new Set();
   const flag = (label, color) => /*#__PURE__*/React.createElement("span", {
     className: "inline-flex items-center gap-1 font-bold uppercase",
@@ -3664,11 +4180,13 @@ function OrgChart({
     if (seen.has(p.id)) return null;
     seen.add(p.id);
     const kids = childrenOf(p.id);
+    const ag = isAgency(p);
     const vac = isVacant(p);
     const ld = load(p.id);
     const over = ld > target;
-    const kp = !vac && heavy(p.id) >= 2;
+    const kp = !vac && !ag && heavy(p.id) >= 2;
     const ru = rollup(p.id);
+    const pcost = projectedCost(p, yrs || 0);
     const dropOk = canDrop(p.id);
     const isOver = overId === p.id && dropOk;
     const isDragging = dragId === p.id;
@@ -3707,8 +4225,8 @@ function OrgChart({
       title: "Drag onto another card to change who this reports to",
       className: "self-start rounded-lg px-3 py-2",
       style: {
-        background: isOver ? "#E8F5EC" : vac ? VACANT_BG : "#fff",
-        border: "1px solid " + (isOver ? TEAL : vac ? AMBER_BORDER : COL_BORDER),
+        background: isOver ? "#E8F5EC" : ag ? AGENCY_BG : vac ? VACANT_BG : "#fff",
+        border: "1px solid " + (isOver ? TEAL : ag ? AGENCY_BORDER : vac ? AMBER_BORDER : COL_BORDER),
         borderStyle: vac && !isOver ? "dashed" : "solid",
         boxShadow: isOver ? "0 0 0 2px " + TEAL : "none",
         opacity: isDragging ? 0.45 : 1,
@@ -3724,7 +4242,15 @@ function OrgChart({
       }
     }, /*#__PURE__*/React.createElement(IconGrip, {
       size: 13
-    })), vac && /*#__PURE__*/React.createElement("span", {
+    })), ag && /*#__PURE__*/React.createElement("span", {
+      className: "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5",
+      style: {
+        background: AGENCY_PILL,
+        color: AGENCY_TX
+      }
+    }, /*#__PURE__*/React.createElement(IconBuilding, {
+      size: 10
+    }), "Third-party"), vac && /*#__PURE__*/React.createElement("span", {
       className: "text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5",
       style: {
         background: AMBER_PILL,
@@ -3733,19 +4259,24 @@ function OrgChart({
     }, "Open role"), /*#__PURE__*/React.createElement("span", {
       className: "font-bold text-sm",
       style: {
-        color: vac ? AMBER_TX : SLATE
+        color: ag ? AGENCY_TX : vac ? AMBER_TX : SLATE
       }
     }, colLabel(p)), !vac && p.role && p.role.trim() && /*#__PURE__*/React.createElement("span", {
       className: "text-xs",
       style: {
-        color: "#7C8B80"
+        color: ag ? "#9180C9" : "#7C8B80"
       }
     }, p.role)), /*#__PURE__*/React.createElement("div", {
       className: "text-[11px] mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 items-center",
       style: {
         color: "#52635A"
       }
-    }, /*#__PURE__*/React.createElement("span", {
+    }, ag ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: AGENCY_TX
+      }
+    }, fmtMoney(pcost), "/yr · ", p.contractMode === "fixed" && p.contractYears > 0 ? p.contractYears + "-yr contract" : "ongoing") : /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 600
       }
@@ -3753,14 +4284,18 @@ function OrgChart({
       style: {
         color: over ? LOAD_OVER : "#52635A"
       }
-    }, "· load ", ld, "/", target), over && flag("over", LOAD_OVER), kp && flag("key-person", LOAD_OVER)), kids.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "· load ", ld, "/", target), !ag && pcost > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#7C8B80"
+      }
+    }, "· ", fmtMoney(pcost), "/yr"), over && flag("over", LOAD_OVER), kp && flag("key-person", LOAD_OVER)), kids.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "text-[11px] mt-1 inline-flex items-center gap-1.5 self-start rounded-md px-2 py-0.5 font-semibold",
       style: {
         background: "#EFF6F1",
         color: TEAL,
         border: "1px solid " + COL_BORDER
       }
-    }, "Team of ", ru.filled, ru.filled === 1 ? " person" : " people", ru.open > 0 ? " + " + ru.open + " open" : "", " · ", fmtMoney(ru.cost), "/yr")), kids.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "Team of ", ru.filled, ru.filled === 1 ? " person" : " people", ru.open > 0 ? " + " + ru.open + " open" : "", ru.agencies > 0 ? " + " + ru.agencies + (ru.agencies === 1 ? " agency" : " agencies") : "", " · ", fmtMoney(ru.cost), "/yr")), kids.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "pl-4 ml-3 flex flex-col gap-2",
       style: {
         borderLeft: "2px solid " + COL_BORDER
