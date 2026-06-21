@@ -74,7 +74,8 @@ const AGENCY_PILL = "#EDE9FE";
 const TAB_YEARS = {
   today: 0,
   m6: 0.5,
-  m12: 1
+  m12: 1,
+  m36: 3
 };
 const UNASSIGNED = "__unassigned__";
 const STORE_KEY = "boreal-accountability-v2";
@@ -229,14 +230,19 @@ const TABS = [{
 }, {
   key: "m12",
   label: "In 12 months"
+}, {
+  key: "m36",
+  label: "In 3 years"
 }];
 const PREV = {
   m6: "today",
-  m12: "m6"
+  m12: "m6",
+  m36: "m12"
 };
 const NEXT = {
   today: "m6",
-  m6: "m12"
+  m6: "m12",
+  m12: "m36"
 };
 const tabLabel = k => (TABS.find(t => t.key === k) || {}).label || k;
 const GRAIN = ["Broad", "Standard", "Detailed", "Granular"];
@@ -306,7 +312,8 @@ const LIBRARY = {
 const SUBTITLE = {
   today: "Your team today, and how responsibilities are divided right now.",
   m6: "Plan 6 months out — add open roles, shift responsibilities onto them, and add names as you hire.",
-  m12: "Plan 12 months out — model the team you'll need as workload grows."
+  m12: "Plan 12 months out — model the team you'll need as workload grows.",
+  m36: "Plan 3 years out — the long-range org: who you've hired, which agencies stay or roll off, and what it all costs as it compounds."
 };
 
 // ---- inline icons ----
@@ -546,9 +553,23 @@ const SEED = {
     m12: {
       people: [],
       cards: []
+    },
+    m36: {
+      people: [],
+      cards: []
     }
   }
 };
+function withAllTabs(v) {
+  const out = Object.assign({}, v || {});
+  TABS.forEach(t => {
+    if (!out[t.key]) out[t.key] = {
+      people: [],
+      cards: []
+    };
+  });
+  return out;
+}
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -698,7 +719,7 @@ function scenarioStats(v, target, years) {
 }
 function App() {
   const init = loadState() || SEED;
-  const [views, setViews] = useState(init.views);
+  const [views, setViews] = useState(withAllTabs(init.views));
   const [tab, setTab] = useState(init.tab || "today");
   const [meta, setMeta] = useState(init.meta || {
     capacityTarget: DEFAULT_TARGET
@@ -755,7 +776,7 @@ function App() {
     }
     const who = data.sharedBy ? " shared by " + data.sharedBy : "";
     if (window.confirm("Load the plan" + who + "? This replaces what's currently on this device.")) {
-      setViews(data.views);
+      setViews(withAllTabs(data.views));
       if (data.tab) setTab(data.tab);
       if (data.meta) setMeta(data.meta);
     }
@@ -1677,7 +1698,7 @@ function App() {
     author: author,
     setAuthor: setAuthor,
     onImport: data => {
-      setViews(data.views);
+      setViews(withAllTabs(data.views));
       if (data.tab) setTab(data.tab);
       if (data.meta) setMeta(data.meta);
       setShareOpen(false);
@@ -3727,8 +3748,8 @@ function TransitionPlan({
   initialFrom,
   onClose
 }) {
-  const [fromKey, setFromKey] = useState(initialFrom === "m12" ? "today" : initialFrom);
-  const [toKey, setToKey] = useState(NEXT[initialFrom] || "m12");
+  const [fromKey, setFromKey] = useState(NEXT[initialFrom] ? initialFrom : PREV[initialFrom] || "today");
+  const [toKey, setToKey] = useState(NEXT[initialFrom] || initialFrom);
   const [jdHire, setJdHire] = useState(null);
   const diff = diffViews(views[fromKey], views[toKey]);
   const dstView = views[toKey];
